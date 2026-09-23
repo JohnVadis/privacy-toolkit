@@ -183,6 +183,42 @@ class TestGenerate:
         assert (output_dir(load_client(client_path("Generating")))
                 / "demo_redaction__primary.pdf").is_file()
 
+    def test_an_engine_failure_reports_instead_of_a_bare_500(self, app_client,
+                                                              example_client,
+                                                              monkeypatch):
+        import webapp.routers.generate as route
+
+        save_client("Generating", example_client)
+
+        def boom(*a, **k):
+            raise OSError("the blank form is open in another program")
+
+        monkeypatch.setattr(route, "fill_client", boom)
+        response = app_client.post("/clients/Generating/generate",
+                                   data={"forms[]": "demo_redaction"})
+        assert response.status_code == 500
+        assert "Generation stopped part-way" in response.text
+        assert "another program" in response.text       # names the actual problem
+
+    def test_a_partial_failure_still_lists_what_was_written(self, app_client,
+                                                             example_client,
+                                                             monkeypatch):
+        import webapp.routers.generate as route
+
+        save_client("Generating", example_client)
+        # One form succeeds, then the run dies.
+        app_client.post("/clients/Generating/generate",
+                        data={"forms[]": "demo_redaction"})
+
+        def boom(*a, **k):
+            raise RuntimeError("stopped")
+
+        monkeypatch.setattr(route, "fill_client", boom)
+        body = app_client.post("/clients/Generating/generate",
+                               data={"forms[]": "demo_redaction"}).text
+        # The worker can see which file exists rather than guessing.
+        assert "demo_redaction__primary.pdf" in body
+
     def test_lists_what_was_generated(self, app_client, example_client):
         save_client("Generating", example_client)
         app_client.post("/clients/Generating/generate",

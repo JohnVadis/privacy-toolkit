@@ -42,7 +42,16 @@
             {% if f.person %}{{ f.person.replace('_', ' ') }}
             {% else %}<span class="muted">—</span>{% endif %}
           </td>
-          <td>{{ f.modified.strftime('%d %b %Y, %H:%M') }}</td>
+          <td>{{ f.modified.strftime('%d %b %Y, %H:%M') }}
+            {% if f.provenance.status == 'modified' %}
+              <br><span class="tag" style="border-color: var(--warn); color: var(--warn)"
+                       title="The file on disk differs from the one the toolkit generated. That is expected once it has been signed or annotated.">edited since</span>
+            {% elif f.provenance.status == 'unlogged' %}
+              <br><span class="muted">no record</span>
+            {% elif f.provenance.generations and f.provenance.generations > 1 %}
+              <br><span class="muted">generated {{ f.provenance.generations }}×</span>
+            {% endif %}
+          </td>
           <td class="num">{{ f.size_h }}</td>
           <td class="actions">
             {% if f.is_pdf %}
@@ -67,7 +76,10 @@
 
   <p class="muted" style="margin-top:1rem">
     These files live in <span class="mono">{{ output_rel }}/</span> on this computer.
-    Generating the same form again replaces the file.
+    Generating the same form again replaces the file. Each one is recorded in
+    <span class="mono">.generation-log.jsonl</span> beside them — what was produced,
+    from which mapping, with a checksum — so a filed document can be traced back
+    to what made it.
   </p>
 {% endif %}
 

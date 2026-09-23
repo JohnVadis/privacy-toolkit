@@ -1,5 +1,5 @@
 # Test-only dependencies. The app itself never needs these — keep requirements.txt
 # lean so "Start Privacy Toolkit.bat" stays a fast install for a non-technical user.
 -r requirements.txt
-pytest>=8.0
-httpx2>=0.28          # starlette's TestClient, for the webapp route tests
+pytest==9.1.1
+httpx2==2.13.1             # starlette's TestClient, for the webapp route tests

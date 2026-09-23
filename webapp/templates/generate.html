@@ -14,6 +14,16 @@
   <a class="btn" href="{{ url_for('worklist_page', slug=slug) }}">Opt-out worklist</a>
 </div>
 
+{% if failure %}
+  <div class="note note-error">
+    <strong>Generation stopped part-way.</strong>
+    <p style="margin:0.4rem 0">Anything listed below was written before it stopped;
+      anything you expected and can't see was not. Fix the problem and generate again —
+      re-generating replaces a file rather than duplicating it.</p>
+    <p class="mono" style="margin:0">{{ failure }}</p>
+  </div>
+{% endif %}
+
 {% if errors %}
   <div class="note note-error">
     <strong>Nothing was generated — fix these first.</strong>

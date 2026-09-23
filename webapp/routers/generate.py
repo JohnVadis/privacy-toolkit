@@ -16,6 +16,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import (FileResponse, HTMLResponse, RedirectResponse,
                                Response)
 
+import generation_log
 from build_worklist import WORKLIST_FILENAME, build_worklist, load_sites
 from client_context import ClientDataError, person_roles
 from fill_forms import fill_client, generated_files, list_mappings, output_dir
@@ -52,6 +53,7 @@ def _picker_context(request: Request, slug: str, client: dict, **extra) -> dict:
         "people": _people(client),
         "forms": _available_forms(),
         "output_rel": f"output/{output_dir(client).name}",
+        "failure": "",
     }
     ctx.update(extra)
     return ctx
@@ -92,19 +94,44 @@ async def generate_run(request: Request, slug: str):
     # The engine's progress lines name the client and output paths, so they go to a
     # per-request collector shown once on the page — never to a server log.
     log, report = collector()
+    failure = ""
     try:
-        made = fill_client(client, persons=chosen_people, form_keys=chosen_forms, report=report)
+        made = fill_client(client, persons=chosen_people, form_keys=chosen_forms,
+                           report=report)
     except ClientDataError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        # A locked PDF, a full disk, a mapping that resolves to nothing — the engine
+        # may already have written some of the forms before failing. A bare 500 left
+        # the worker with no idea which, so report what DID get made and name the
+        # problem. The message is the exception's, which carries no field values.
+        made = generated_before_failure(client, chosen_people, chosen_forms)
+        failure = f"{type(exc).__name__}: {exc}"
+        report(f"[FAIL] generation stopped — {failure}")
 
     results = [{"filename": p.name, "form_key": p.stem.split("__")[0],
                 "person": p.stem.split("__")[-1]} for p in made]
     return templates.TemplateResponse(
         request=request, name="generate.html",
         context=_picker_context(request, slug, client, errors=[], warnings=warnings(found),
-                                results=results, log=log,
+                                results=results, log=log, failure=failure,
                                 selected_people=chosen_people, selected_forms=chosen_forms),
+        status_code=500 if failure else 200,
     )
+
+
+def generated_before_failure(client, people, forms) -> list:
+    """The outputs that exist for this run, after the engine stopped part-way."""
+    wanted = set(forms or [])
+    roles = set(people or [])
+    out = []
+    for row in generated_files(client):
+        if wanted and row["form_key"] not in wanted:
+            continue
+        if roles and row["person"] not in roles:
+            continue
+        out.append(row["path"])
+    return out
 
 
 def _as_list(value):
@@ -177,7 +204,7 @@ async def client_files(request: Request, slug: str):
             "nav": "clients",
             "slug": slug,
             "display_name": (client.get("case") or {}).get("display_name") or slug,
-            "files": _decorate(generated_files(client)),
+            "files": _decorate(generated_files(client), client),
             "output_rel": f"output/{output_dir(client).name}",
         },
     )
@@ -188,7 +215,7 @@ async def view_file(request: Request, slug: str, filename: str):
     """Read a filled form in the app: every page, zoomable, printable."""
     slug, client = get_client(slug)
     path = output_file(client, filename)
-    files = _decorate(generated_files(client))
+    files = _decorate(generated_files(client), client)
     current = next((f for f in files if f["filename"] == path.name), None)
     return templates.TemplateResponse(
         request=request, name="view.html",
@@ -232,12 +259,17 @@ async def reveal_file(request: Request, slug: str, filename: str):
     return RedirectResponse(url_for(request, "client_files", slug=slug), status_code=303)
 
 
-def _decorate(rows: list[dict]) -> list[dict]:
-    """Add the human-readable form title and size to each generated file."""
+def _decorate(rows: list[dict], client: dict | None = None) -> list[dict]:
+    """Add the form title, the size, and what the generation log says about it."""
     titles = {m["form_key"]: (m.get("title") or "") for m in list_mappings()}
+    out_dir = output_dir(client) if client else None
     for r in rows:
         r["title"] = titles.get(r["form_key"], "")
         r["size_h"] = _human_size(r["size"])
+        # "Is the file I'm about to file the one the toolkit made?" — answerable
+        # now, and worth answering on the screen where someone picks a file to send.
+        r["provenance"] = (generation_log.verify(out_dir, r["filename"])
+                           if out_dir else {"status": "unlogged"})
     return rows
 
 

@@ -27,6 +27,7 @@ from pathlib import Path
 import yaml
 
 import documents
+import generation_log
 import pdf_attachment
 import pdf_fill
 import pdf_overlay
@@ -561,6 +562,17 @@ def fill_one(mapping_path, client, person, report=print):
     out = fill(mapping, client, person, form_key, report)
     report(f"[ok]   {form_key} ({mode})  ->  {rel(out)}")
     apply_corrections(client, form_key, person, out, report=report)
+
+    # Journalled AFTER corrections, so the hash is of the document as filed. This
+    # never raises; a form that generated is worth more than its audit line.
+    generation_log.record(
+        out, form_key=form_key, person=person or (client.get("persons") or [{}])[0].get("role", ""),
+        mapping_path=resolve(mapping_path), blank_pdf=resolve(mapping["pdf"]),
+        client=client,
+        extra={"mode": mode,
+               "documents": len(documents.for_form(client, documents.DEFAULT_LIST,
+                                                   person))} if mapping.get("tables")
+        else {"mode": mode})
     return out
 
 

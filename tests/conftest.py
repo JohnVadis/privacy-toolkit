@@ -64,9 +64,15 @@ def pytest_sessionfinish(session, exitstatus):
 # ---------------------------------------------------------------------------
 @pytest.fixture(autouse=True)
 def clean_sandbox():
-    """Empty the writable folders around every test, so order never matters."""
+    """Empty every writable folder around each test, so order never matters.
+
+    All four of these accumulate client data in normal use, which is exactly why
+    they all belong here — leaving feedback/ out let the Comment tests' screenshots
+    show up in a later test's housekeeping report.
+    """
     def wipe():
-        for d in (paths.CLIENTS_DIR, paths.OUTPUT_DIR, paths.TRASH_DIR):
+        for d in (paths.CLIENTS_DIR, paths.OUTPUT_DIR, paths.TRASH_DIR,
+                  paths.ROOT / "feedback"):
             shutil.rmtree(d, ignore_errors=True)
             d.mkdir(parents=True, exist_ok=True)
 

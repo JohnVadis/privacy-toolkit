@@ -1,14 +1,26 @@
+# Pinned exactly, on purpose.
+#
+# The toolkit's promise is that the same client file produces the same PDF. That
+# holds for a given set of libraries and not across them: reportlab decides where a
+# glyph sits, pypdf decides how pages merge, and a minor release of either can move
+# text on a filed government form without anything failing. Every generated PDF
+# records the versions that produced it (see the generation log), and these are the
+# versions the mappings were verified against.
+#
+# To move one: bump it here, run `pytest` (the golden test checks real coordinates on
+# the real Clerk form), then re-run docs/verification-checklist.md before filing.
+
 # Engine (CLI) — deterministic fill path, no network, no model calls.
-pypdf>=4.0
-PyYAML>=6.0
-openpyxl>=3.1
-pdfplumber>=0.11        # overlay anchors (pdf_overlay.py)
-reportlab>=4.0          # overlay stamping (pdf_overlay.py)
+pypdf==6.19.0
+PyYAML==6.0.3
+openpyxl==3.1.5
+pdfplumber==0.11.10        # overlay anchors (pdf_overlay.py)
+reportlab==5.0.1           # overlay stamping (pdf_overlay.py)
 
 # Local web UI (webapp/) — binds to 127.0.0.1, no outbound calls.
-fastapi>=0.110
-uvicorn>=0.27
-jinja2>=3.1
-python-multipart>=0.0.9  # form POST parsing
-pypdfium2>=4.25          # page-1 PNG previews (already a pdfplumber dep)
-pywebview>=5.0           # desktop window (uses the WebView2 runtime already on Win10/11)
+fastapi==0.141.1
+uvicorn==0.53.0
+jinja2==3.1.6
+python-multipart==0.0.32   # form POST parsing
+pypdfium2==5.13.0          # page PNG previews (already a pdfplumber dep)
+pywebview==6.2.1           # desktop window (uses the WebView2 runtime already on Win10/11)

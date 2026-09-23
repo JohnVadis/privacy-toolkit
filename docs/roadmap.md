@@ -86,9 +86,15 @@ something to put somewhere safe. **Partly addressed (2026-09-23):** client files
 now versioned locally in `clients/_backups/<slug>/` on every save, and the repo is
 under git — but that is still one machine, and neither covers `output/`.
 
-### H3. Flatten output + log generations (was #9)
-Filled values are still live text, and nothing records what was produced for whom and
-when. Both matter for a defensible filing.
+### H3. Flatten output + log generations (was #9) — **half done (2026-09-23)**
+Logging is in: `generation_log.py` writes one line per filled form into
+`output/<client>/.generation-log.jsonl` — the form, the person, SHA-256 of the output,
+of the mapping and of the blank PDF, plus the library versions that drew it. The
+filled-forms screen flags a file that no longer matches what was generated.
+
+Still open: filled values are live text, not flattened, so a generated PDF can be
+edited after the fact. The log now makes that detectable; flattening would make it
+hard.
 
 ### H4. No automated tests — **DONE (2026-09-23)**
 236 tests under `tests/`, ~11s, run with `pytest`. They cover context building, the
@@ -109,8 +115,12 @@ The mapping editor, the form importer and the Comment feature are covered too
 refused mapping save, an editor edit that deleted the Clerk form's `tables:` block,
 and colliding comment filenames — all fixed in the same commit.
 
-### H5. `trash/` is never pruned
-Deleted clients accumulate with their PII.
+### H5. `trash/` is never pruned — **DONE (2026-09-23)**
+`housekeeping.py` reports what has piled up in `trash/` and `feedback/` (screenshots
+of the app are client data too) and prunes past a retention — 90 days for trash,
+30 for feedback. It only ever runs when a person types it: nothing on a schedule,
+nothing at startup, because "the tool quietly deleted the case I was restoring" is
+worse than a folder that grew.
 
 ### H6. No one-page guide for the worker
 The README is written for a developer.

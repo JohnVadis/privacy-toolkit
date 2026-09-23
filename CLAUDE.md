@@ -66,8 +66,13 @@ python import_documents.py --client clients/<name>.yaml export.csv --match "SMIT
 python import_documents.py --client clients/<name>.yaml releases.csv --list release
 python import_documents.py --client clients/<name>.yaml export.csv --dry-run
 
-# Build the opt-out worklist spreadsheet
+# Build the opt-out worklist spreadsheet (MERGES — never destroys tracked status)
 python build_worklist.py --client clients/<name>.yaml
+
+# See what client data has piled up in trash/ and feedback/, and prune it
+python housekeeping.py                        # report only
+python housekeeping.py --prune --dry-run
+python housekeeping.py --prune
 
 # Run the desktop app
 python -m webapp.desktop                # app window; closing it stops the server
@@ -139,6 +144,14 @@ display name, because two clients can share a display name and then share a fold
 - `webapp/security.py` — Host / cross-site / session-token gate in front of every request.
 - `webapp/desktop.py` — the pywebview window; server on a background thread. Downloads
   need `ALLOW_DOWNLOADS=True` or pywebview cancels them silently.
+- `generation_log.py` — one JSONL line per filled form, in
+  `output/<client>/.generation-log.jsonl`: what was produced, from which mapping and
+  blank PDF (by SHA-256), with the library versions that drew it. `verify()` answers
+  "is this file still the one the toolkit made?". Never raises — a form that
+  generated is worth more than its audit line.
+- `housekeeping.py` — retention for the two folders that fill with client data as a
+  side effect (`trash/`, `feedback/`). Reports by default; prunes only when asked,
+  never on a schedule and never at startup.
 - `trash/` — deleted clients (file + generated output) are MOVED here, never unlinked.
 - `feedback.py` + `webapp/routers/feedback.py` — the Comment feature. It captures the
   window, lets the user redact, saves to `feedback/` (gitignored) and OPENS a mail
@@ -154,6 +167,9 @@ zero. When adding a county or form, you're writing one mapping file, not code.
 
 ## Key conventions
 - Python 3, standard library + pypdf / pdfplumber / reportlab / openpyxl / PyYAML.
+  Versions are PINNED EXACTLY in requirements.txt: reportlab decides where a glyph
+  sits and a minor release can move text on a filed form. Bumping one means re-running
+  `pytest` (the golden test checks real coordinates) and docs/verification-checklist.md.
 - Dates render MM/DD/YYYY regardless of YAML formatting (see `client_context._fmt_date`).
 - Statutory category is set once per client in `exemption.category`
   (`military` | `law_enforcement` | `judges`); each form checks the right box via a
