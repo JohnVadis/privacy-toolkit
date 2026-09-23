@@ -51,6 +51,11 @@ python fill_forms.py --client clients/<name>.yaml --forms hillsborough_clerk_red
 # Fill for every person in the file (spouse, children) in one run
 python fill_forms.py --client clients/<name>.yaml --all-persons
 
+# Run the tests (see docs/testing.md). The golden test skips without the blank PDFs.
+pip install -r requirements-dev.txt
+pytest
+pytest tests/test_golden_hillsborough.py   # coordinates on the real Clerk form
+
 # Pre-flight a client file before generating (exits non-zero on errors)
 python validate_client.py --client clients/<name>.yaml
 python validate_client.py --all
@@ -160,6 +165,7 @@ zero. When adding a county or form, you're writing one mapping file, not code.
 - `docs/webapp.md` — web UI routes, the reuse boundary, and how the rules are enforced.
 - `docs/adding-forms.md` — how to map a new county form (incl. finding checkbox coords).
 - `docs/forms-reference.md` — field-by-field detail of the four wired forms.
+- `docs/testing.md` — what the suite covers, and how it stays off real client data.
 - `docs/verification-checklist.md` — run this the first time any form is used for real.
 - `docs/decisions.md` — why it's built this way (buy-vs-build, overlay, human gates).
 - `docs/roadmap.md` — prioritized next tasks, most-ready first.
@@ -169,3 +175,8 @@ zero. When adding a county or form, you're writing one mapping file, not code.
 A mapping is done when a rendered fill (`pdftoppm -png` the output) shows every value
 on its line and every checkbox in its box, verified against a real client's data and
 spot-checked for each statutory category the form will be used for.
+
+Then pin it: `tests/test_golden_hillsborough.py` is the pattern — assert each value's
+coordinate on the county's own PDF, and assert the boxes that must stay EMPTY are
+empty. That is what turns "someone checked it once" into a test that fails the next
+time a coordinate moves.

@@ -241,6 +241,16 @@ Edit `sites.yaml` to match the client's checklist, then:
 python build_worklist.py --client clients/lastname_firstname.yaml
 ```
 
+## Tests
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+236 tests, about eleven seconds, and they never touch `clients/` or `output/` — the
+suite points the toolkit at a temporary directory first. The one test that fills the
+real Clerk form and checks every coordinate skips unless the county blank PDFs are
+present. Details in `docs/testing.md`.
+
 ## Seeing what's been generated
 Every client row shows a **Filled forms** count. Click it for that client's forms —
 newest first, with the real form name, who it's for, and when it was made. Each one

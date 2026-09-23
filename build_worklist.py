@@ -88,15 +88,17 @@ def read_tracking(path) -> dict:
                 return row[i] if i is not None and i < len(row) else None
 
             values = {c: cell(c) for c in USER_COLUMNS}
-            # Kept so a row whose site later leaves the catalog can still be labelled
-            # with the name the worker saw, rather than an internal key.
-            values["_site"] = cell("Site")
-            # "not_started" with nothing else filled in is an untouched row.
+            # "not_started" with nothing else filled in is an untouched row. Judged
+            # over USER_COLUMNS alone — anything else in this dict (the label below)
+            # is always populated and would make every row look worked-on.
             touched = any(str(v).strip() for c, v in values.items()
                           if v is not None and not (c == "Status" and
                                                     str(v).strip() in ("", "not_started")))
             if not touched:
                 continue
+            # Kept so a row whose site later leaves the catalog can still be labelled
+            # with the name the worker saw, rather than an internal key.
+            values["_site"] = cell("Site")
             key = cell(KEY_COLUMN) or cell("Site")
             if key:
                 tracked[str(key).strip()] = values

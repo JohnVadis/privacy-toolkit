@@ -231,7 +231,16 @@ def _row_from(raw: list, columns: dict, default_list: str) -> dict | None:
 
 
 def decode(data: bytes) -> str:
-    """Bytes from a file or an upload as text, tolerating a BOM and a cp1252 export."""
+    """Bytes from a file or an upload as text, tolerating a BOM and a cp1252 export.
+
+    The NUL check is what actually catches a mis-picked file: latin-1 decodes any
+    byte sequence at all, so without it a .xlsx or a PDF came back as mojibake and
+    failed later with a confusing complaint about column headings.
+    """
+    if b"\x00" in data[:4096]:
+        raise DocumentImportError(
+            "That looks like a spreadsheet or a PDF rather than a CSV. Use the "
+            "search's Export to Spreadsheet (it writes a .csv), or paste the rows.")
     for encoding in ("utf-8-sig", "utf-8", "cp1252", "latin-1"):
         try:
             return data.decode(encoding)

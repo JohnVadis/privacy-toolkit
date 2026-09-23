@@ -7,9 +7,16 @@ path is anchored to this file's directory instead. Import these rather than
 writing "output/..." or "forms/mappings/..." by hand.
 """
 from __future__ import annotations
+import os
 import sys
 from pathlib import Path
 import re
+
+# Point the toolkit at a different data directory. The test suite sets this so it
+# can exercise the real save/delete/fill paths against a sandbox — never against
+# someone's actual clients/ and output/.
+HOME_ENV = "PRIVACY_TOOLKIT_HOME"
+
 
 def _root() -> Path:
     """Where the toolkit's own files live.
@@ -18,6 +25,9 @@ def _root() -> Path:
     PyInstaller unpacks into, which is deleted on exit and would take every client
     file with it. Running from source it is this file's folder, as before.
     """
+    override = os.environ.get(HOME_ENV)
+    if override:
+        return Path(override).resolve()
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parent

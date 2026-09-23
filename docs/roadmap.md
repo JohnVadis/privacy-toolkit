@@ -90,9 +90,17 @@ under git — but that is still one machine, and neither covers `output/`.
 Filled values are still live text, and nothing records what was produced for whom and
 when. Both matter for a defensible filing.
 
-### H4. No automated tests
-Everything is verified by hand. A small suite over context building, the form
-round-trip, validation, output naming and `check_mapping` would catch regressions.
+### H4. No automated tests — **DONE (2026-09-23)**
+236 tests under `tests/`, ~11s, run with `pytest`. They cover context building, the
+overlay round-trip on a synthetic form, validation, output naming, the document
+parser, the worklist merge and `check_mapping` over every shipped mapping — plus a
+golden test that pins each value's coordinate on the real Clerk form (it skips
+without the gitignored blank PDFs, so CI runs the rest). The suite redirects
+`paths.ROOT` to a temp dir before importing anything, so it exercises the real save
+and delete paths without going near real client data. See `docs/testing.md`.
+
+Still open: no coverage of `webapp/` routes (the security gate, the HTMX fragments,
+the document picker) — those were checked by driving the running app by hand.
 
 ### H5. `trash/` is never pruned
 Deleted clients accumulate with their PII.
