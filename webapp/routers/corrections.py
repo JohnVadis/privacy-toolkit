@@ -16,7 +16,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 import pdf_render
 from client_context import save_client
 from fill_forms import (client_corrections, fill_one, form_key_for, form_layout,
-                        load_mapping, mapping_paths, split_output_name)
+                        load_mapping, mapping_paths, mark_signature, split_output_name)
 from webapp.deps import get_client, output_file, templates, url_for
 from webapp.formparse import parse_nested
 
@@ -110,6 +110,12 @@ async def edit_text_save(request: Request, slug: str, filename: str):
             by_rule = str(row.get("by_rule", "")).lower() in ("1", "true", "on", "yes")
             if on != by_rule:
                 item = {"entry": entry, "on": on}
+                # Where this tick lands, so a later mapping edit that reorders
+                # entries can't silently move it onto a different box.
+                if overlay and isinstance(entry, int):
+                    source = (mapping.get("entries") or [])
+                    if 0 <= entry < len(source) and isinstance(source[entry], dict):
+                        item["at"] = mark_signature(source[entry])
                 if person:
                     item["person"] = person
                 ticks.append(item)

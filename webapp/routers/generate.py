@@ -268,14 +268,15 @@ async def worklist_run(request: Request, slug: str):
     slug, client = get_client(slug)
     data = parse_nested((await request.form()).multi_items())
     person = str(data.get("person") or "") or None
+    stats: dict = {}
     try:
-        path = build_worklist(client, person)
+        path = build_worklist(client, person, stats=stats)
     except ClientDataError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return templates.TemplateResponse(
         request=request, name="worklist.html",
         context=_worklist_context(request, slug, client, built=path.name, just_built=True,
-                                  person=person),
+                                  person=person, stats=stats),
     )
 
 
@@ -291,6 +292,7 @@ def _worklist_context(request: Request, slug: str, client: dict, **extra) -> dic
         "built": None,
         "just_built": False,
         "person": None,
+        "stats": {},
     }
     ctx.update(extra)
     return ctx

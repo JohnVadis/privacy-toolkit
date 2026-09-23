@@ -7,12 +7,27 @@ so a form, a worklist and the UI always draw from the same single source of trut
 """
 from __future__ import annotations
 import datetime as _dt
+import os
 import shutil
+import tempfile
+import threading
+import time
 from pathlib import Path
 import yaml
 
 from paths import (CLIENTS_DIR, OUTPUT_DIR, RESERVED_CLIENT_STEMS, TRASH_DIR,
-                   resolve, slugify)
+                   client_output_dir, contains, resolve, slugify)
+
+# Previous versions of every client file. The mappings have had this since day one;
+# the client files — the only thing here that cannot be regenerated — did not.
+CLIENT_BACKUP_DIR = CLIENTS_DIR / "_backups"
+KEEP_BACKUPS = 20
+
+# Serializes writes within this process. Across processes (the CLI while the app is
+# open) the lock file below does it.
+_write_lock = threading.Lock()
+LOCK_TIMEOUT = 10.0          # seconds to wait for another process to finish
+LOCK_STALE_AFTER = 60.0      # a lock older than this was left by something that died
 
 
 # Every variable build_context() produces, grouped for a picker. Keeping the list
@@ -111,9 +126,26 @@ class ClientDataError(Exception):
 # --------------------------------------------------------------------------
 # load / save
 # --------------------------------------------------------------------------
+# Where a loaded client remembers which FILE it came from. Not part of the client
+# model and never written back — `dump_client` drops it. It exists because the output
+# folder has to be keyed on something unique, and a display name is not: two clients
+# called "Smith, John" used to share one folder and silently overwrite each other's
+# filled forms.
+SLUG_KEY = "__slug__"
+
+
+def client_slug(client: dict) -> str:
+    """The file stem this client was loaded from, or "" for one built in memory."""
+    return str((client or {}).get(SLUG_KEY) or "")
+
+
 def load_client(path) -> dict:
-    with open(resolve(path), encoding="utf-8") as fh:
-        return yaml.safe_load(fh) or {}
+    path = resolve(path)
+    with open(path, encoding="utf-8") as fh:
+        client = yaml.safe_load(fh) or {}
+    if isinstance(client, dict):
+        client[SLUG_KEY] = Path(path).stem
+    return client
 
 
 def client_path(slug: str) -> Path:
@@ -144,7 +176,7 @@ def list_clients() -> list[dict]:
                 county=home.get("county") or "",
                 category=exm.get("category") or "",
                 person_count=len(persons),
-                output_slug=slugify(case.get("display_name") or p.stem),
+                output_slug=output_dir(client).name,
             )
         except Exception as exc:  # a malformed file must not break the list
             row.update(display_name="", case_number="", county="", category="",
@@ -174,40 +206,165 @@ _QuotingDumper.add_representer(str, _represent_str)
 
 
 def dump_client(client: dict) -> str:
-    """Serialize a client dict to YAML in template order."""
-    return yaml.dump(client, Dumper=_QuotingDumper, sort_keys=False,
+    """Serialize a client dict to YAML in template order.
+
+    Keys the toolkit attaches at runtime (SLUG_KEY) are dropped — the file records
+    the client, not where it happened to be loaded from.
+    """
+    body = {k: v for k, v in (client or {}).items() if not str(k).startswith("__")}
+    return yaml.dump(body, Dumper=_QuotingDumper, sort_keys=False,
                      allow_unicode=True, default_flow_style=False, width=100)
 
 
+class _FileLock:
+    """A crude cross-process lock, so the CLI and the app can't interleave a write.
+
+    O_EXCL on a sibling file is the one primitive that behaves the same on Windows
+    and POSIX. A lock left behind by a process that died is taken over once it is
+    clearly stale, because the alternative — a tool that refuses to save until
+    someone deletes a file they don't know about — is worse than the race it avoids.
+    """
+
+    def __init__(self, target: Path):
+        self.path = target.with_suffix(target.suffix + ".lock")
+
+    def __enter__(self):
+        deadline = time.monotonic() + LOCK_TIMEOUT
+        while True:
+            try:
+                fd = os.open(str(self.path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.write(fd, str(os.getpid()).encode())
+                os.close(fd)
+                return self
+            except FileExistsError:
+                try:
+                    age = time.time() - self.path.stat().st_mtime
+                except OSError:
+                    continue                      # it vanished; try again
+                if age > LOCK_STALE_AFTER:
+                    self.path.unlink(missing_ok=True)
+                    continue
+                if time.monotonic() > deadline:
+                    raise ClientDataError(
+                        "Another copy of the toolkit is saving this client. Close the "
+                        "other window (or wait a moment) and try again.")
+                time.sleep(0.1)
+
+    def __exit__(self, *exc):
+        self.path.unlink(missing_ok=True)
+        return False
+
+
+def backup_client(slug: str) -> Path | None:
+    """Copy the current clients/<slug>.yaml aside. Returns where, or None if new."""
+    src = client_path(slug)
+    if not src.is_file():
+        return None
+    dest_dir = CLIENT_BACKUP_DIR / slug
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / f"{_dt.datetime.now():%Y-%m-%d_%H%M%S}.yaml"
+    shutil.copy2(src, dest)
+
+    keep = sorted(dest_dir.glob("*.yaml"))[-KEEP_BACKUPS:]
+    for old in sorted(dest_dir.glob("*.yaml"))[:-KEEP_BACKUPS]:
+        if old not in keep:
+            old.unlink(missing_ok=True)
+    return dest
+
+
 def save_client(slug: str, client: dict) -> Path:
-    """Write clients/<slug>.yaml. Caller is responsible for validating first."""
+    """Write clients/<slug>.yaml. Caller is responsible for validating first.
+
+    Atomic, backed up, and locked. This file is the single source of truth for a
+    client and there is no other copy of it: a half-written one loses the case.
+    The content is rendered BEFORE anything is touched, so a serialization error
+    leaves the existing file exactly as it was.
+    """
     CLIENTS_DIR.mkdir(parents=True, exist_ok=True)
     path = client_path(slug)
-    path.write_text(dump_client(client), encoding="utf-8")
+    body = dump_client(client)
+
+    with _write_lock, _FileLock(path):
+        backup_client(slug)
+        fd, tmp_name = tempfile.mkstemp(dir=str(CLIENTS_DIR), prefix=f".{slug}.",
+                                        suffix=".tmp")
+        tmp = Path(tmp_name)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(body)
+                fh.flush()
+                os.fsync(fh.fileno())        # the rename is only atomic if the data landed
+            os.replace(tmp, path)            # atomic on Windows and POSIX alike
+        except BaseException:
+            tmp.unlink(missing_ok=True)
+            raise
+
+    client[SLUG_KEY] = slug                  # it now has a file; remember which
     return path
+
+
+def output_dir(client: dict) -> Path:
+    """output/<folder>/ for this client. The one definition; everything routes here.
+
+    Keyed on the client's FILE STEM, which the filesystem already guarantees to be
+    unique. It used to be keyed on the display name, which guarantees nothing: two
+    clients called "Smith, John" shared a folder, so generating for one overwrote the
+    other's filled forms, and deleting either sent both to trash.
+
+    A client saved before this change still has its folder under the old
+    display-name slug, so that folder is adopted when it exists — nothing has to be
+    moved, and no history is lost. New clients never collide.
+    """
+    slug = client_slug(client)
+    legacy = _legacy_output_dir(client)
+
+    if not slug:
+        # An in-memory client with no file behind it (a form preview, a test).
+        return legacy or client_output_dir("client")
+
+    current = client_output_dir(slug)
+    if current.is_dir():
+        return current
+    if legacy is not None and legacy.is_dir():
+        return legacy
+    return current
+
+
+def _legacy_output_dir(client: dict) -> Path | None:
+    """Where this client's output lived when the folder came from the display name.
+
+    None when that name yields nothing usable — the case that used to resolve to
+    output/ ITSELF and take every client's paperwork with it on delete.
+    """
+    name = slugify((client.get("case") or {}).get("display_name"))
+    if not name:
+        return None
+    try:
+        return client_output_dir(name)
+    except ValueError:
+        return None
 
 
 def deletion_preview(slug: str) -> dict:
     """What deleting this client would move. Lets the UI show it before asking."""
     path = client_path(slug)
-    out_dir = OUTPUT_DIR / _output_slug(slug)
-    generated = sorted(p.name for p in out_dir.glob("*")) if out_dir.is_dir() else []
+    try:
+        out_dir = output_dir(load_client(path)) if path.is_file() else client_output_dir(slug)
+    except Exception:
+        out_dir = client_output_dir(slug)
+    # Belt and braces: this path is about to be MOVED. If anything above ever
+    # returns the output root again, refuse rather than take every client with it.
+    if not contains(OUTPUT_DIR, out_dir) or out_dir.resolve() == OUTPUT_DIR.resolve():
+        out_dir = None
+
+    generated = sorted(p.name for p in out_dir.glob("*")) if out_dir and out_dir.is_dir() else []
     return {
         "slug": slug,
         "client_file": path,
         "client_file_exists": path.is_file(),
-        "output_dir": out_dir if out_dir.is_dir() else None,
+        "output_dir": out_dir if out_dir and out_dir.is_dir() else None,
         "generated": generated,
     }
-
-
-def _output_slug(slug: str) -> str:
-    """The output/ folder name for a client — from display_name, not the file stem."""
-    try:
-        display = (load_client(client_path(slug)).get("case") or {}).get("display_name")
-    except Exception:
-        display = None
-    return slugify(display or slug)
 
 
 def delete_client(slug: str) -> Path:

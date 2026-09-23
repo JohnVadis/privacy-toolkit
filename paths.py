@@ -53,8 +53,51 @@ def resolve(p) -> Path:
 
 
 def slugify(s: str) -> str:
-    """Lowercase a-z0-9 with single underscores. Used for output dir names."""
+    """Lowercase a-z0-9 with single underscores.
+
+    Can return "" — "..." has nothing to keep. Callers that build a PATH from this
+    must use `safe_dir_name()` instead, which never does.
+    """
     return re.sub(r"[^a-z0-9]+", "_", (s or "client").lower()).strip("_")
+
+
+# Names Windows refuses to use for a directory, whatever the extension.
+_RESERVED_NAMES = ({"con", "prn", "aux", "nul"}
+                   | {f"com{i}" for i in range(1, 10)}
+                   | {f"lpt{i}" for i in range(1, 10)})
+
+# Characters that are safe in a folder name on every platform we target.
+_SAFE_DIR = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,79}$")
+
+
+def safe_dir_name(name: str) -> str:
+    """A folder name that is non-empty, legal, and never a reserved device name.
+
+    Used for the per-client output folder. It must never return "" — an empty
+    segment makes `OUTPUT_DIR / name` resolve to OUTPUT_DIR ITSELF, which turned a
+    single client's delete into a move of every client's paperwork.
+    """
+    name = (name or "").strip().strip(". ")          # Windows rejects both trailing
+    if not _SAFE_DIR.match(name):
+        name = slugify(name)
+    if not name:
+        name = "client"
+    if name.lower() in _RESERVED_NAMES:
+        name += "_"
+    return name
+
+
+def client_output_dir(name: str) -> Path:
+    """output/<name>/ for one client, guaranteed to be a real subfolder of output/.
+
+    Raises rather than returning something surprising: every caller either writes
+    files here, deletes the folder, or moves it to trash, and each of those is
+    destructive if the path is wrong.
+    """
+    path = OUTPUT_DIR / safe_dir_name(name)
+    if path.resolve() == OUTPUT_DIR.resolve() or not contains(OUTPUT_DIR, path):
+        raise ValueError(f"refusing to use {path!s} as a client output folder")
+    return path
 
 
 def contains(parent: Path, child: Path) -> bool:

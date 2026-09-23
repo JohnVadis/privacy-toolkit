@@ -31,7 +31,8 @@ import pdf_attachment
 import pdf_fill
 import pdf_overlay
 from client_context import ClientDataError, build_context, load_client, person_roles
-from paths import MAPPINGS_DIR, OUTPUT_DIR, ROOT, resolve, slugify
+from client_context import output_dir as _client_output_dir
+from paths import MAPPINGS_DIR, ROOT, resolve
 
 CATEGORIES = ("military", "law_enforcement", "judges")
 
@@ -162,8 +163,9 @@ def _fill_overlay(mapping, client, person, form_key, report):
     for i, e in enumerate(mapping.get("entries") or []):
         item = {k: e[k] for k in ("anchor", "occurrence", "page", "x", "y", "dx", "dy", "size") if k in e}
         if "mark" in e:
-            # A box the worker set by hand wins over the mapping's rule, on or off.
-            if not marks.get(i, _marked(e, ctx)):
+            # A box the worker set by hand wins over the mapping's rule, on or off —
+            # provided it still points at the same box (see _mark_state).
+            if not _mark_state(marks, i, e, _marked(e, ctx), report):
                 continue
             item["mark"] = e["mark"] or "X"
         else:
@@ -267,9 +269,9 @@ def generated_files(client: dict) -> list[dict]:
     return rows
 
 
-def output_dir(client: dict) -> Path:
-    """output/<display_name slug>/ — the same folder the CLI has always used."""
-    return OUTPUT_DIR / slugify((client.get("case") or {}).get("display_name"))
+# Re-exported so `from fill_forms import output_dir` keeps working. The definition
+# lives in client_context, next to the identity it depends on.
+output_dir = _client_output_dir
 
 
 def _out_path(client, form_key, person) -> Path:
@@ -317,6 +319,25 @@ def _overridden(overrides: dict, key, entry: dict, fallback: str, report) -> str
     return o["text"]
 
 
+def mark_signature(entry: dict) -> str:
+    """What identifies the BOX an entry ticks, independent of its list position.
+
+    A stored tick records the entry's index, and an index moves the moment anyone
+    inserts a line above it in the mapping — silently re-pointing a hand-set tick at
+    a different box, for every client, on a notarized form. Overrides survive that
+    because they carry `from:` and it is re-checked; marks had nothing. This is their
+    equivalent: where the mark lands, which is the thing the worker was actually
+    looking at when they ticked it.
+    """
+    page = entry.get("page", 1)
+    if "anchor" in entry:
+        where = (f"@{entry['anchor']}#{entry.get('occurrence', 1)}"
+                 f"+{entry.get('dx', 6)},{entry.get('dy', 0)}")
+    else:
+        where = f"{entry.get('x')},{entry.get('y')}"
+    return f"p{page}:{where}"
+
+
 def _marks_for(client: dict, form_key: str, person: str | None = None) -> dict:
     """{entry index: True/False} — boxes the worker ticked or un-ticked by hand.
 
@@ -324,6 +345,10 @@ def _marks_for(client: dict, form_key: str, person: str | None = None) -> dict:
     only the person filling it can answer (which evidence is attached, which notary
     method). This lets them say so without touching the mapping, and it overrides the
     mapping's own decision either way.
+
+    Each value is {"on": bool, "at": signature}. `at` is checked against the mapping
+    at fill time so a reordered mapping cannot move a tick onto a different box; a
+    mark stored before `at` existed has None and is trusted, as it was before.
     """
     stored = (client.get("marks") or {}).get(form_key) or []
     out = {}
@@ -335,8 +360,21 @@ def _marks_for(client: dict, form_key: str, person: str | None = None) -> dict:
             continue
         if who and not person and who != (person_roles(client) or [None])[0]:
             continue
-        out[e["entry"]] = bool(e.get("on"))
+        out[e["entry"]] = {"on": bool(e.get("on")), "at": e.get("at")}
     return out
+
+
+def _mark_state(marks: dict, index: int, entry: dict, fallback: bool, report) -> bool:
+    """The tick for this entry: the worker's, if it still points at the same box."""
+    stored = marks.get(index)
+    if stored is None:
+        return fallback
+    expected = stored.get("at")
+    if expected and expected != mark_signature(entry):
+        report(f"  ! a tick box saved at {expected} no longer matches this entry "
+               "— the mapping changed. Using the mapping's own rule.")
+        return fallback
+    return stored["on"]
 
 
 def form_layout(mapping: dict, client: dict, person: str | None = None,
@@ -369,8 +407,8 @@ def form_layout(mapping: dict, client: dict, person: str | None = None,
         }
         if is_mark:
             item["by_rule"] = _marked(e, ctx)
-            item["on"] = marks.get(i, item["by_rule"])
-            item["forced"] = i in marks
+            item["on"] = _mark_state(marks, i, e, item["by_rule"], report)
+            item["forced"] = i in marks and item["on"] != item["by_rule"]
         else:
             original = _value(e, ctx)
             o = overrides.get(i)

@@ -18,7 +18,26 @@
 
 {% if just_built %}
   <p class="note note-ok"><strong>Worklist built.</strong>
-    Written to <span class="mono">{{ output_rel }}/{{ built }}</span>.</p>
+    Written to <span class="mono">{{ output_rel }}/{{ built }}</span>.
+    {% if stats.preserved %}
+      Kept the tracked status of <strong>{{ stats.preserved }}</strong> site(s) you had
+      already worked.
+    {% endif %}
+    {% if stats.carried_over %}
+      <strong>{{ stats.carried_over }}</strong> row(s) were kept for sites no longer in
+      the catalog, so their submissions stay on the record.
+    {% endif %}
+    {% if stats.backup %}
+      The previous version was copied to
+      <span class="mono">{{ output_rel }}/_worklist_backups/</span>.
+    {% endif %}</p>
+{% endif %}
+
+{% if built and not just_built %}
+  <p class="note note-warn"><strong>You already have a worklist for this client.</strong>
+    Rebuilding keeps everything you've filled in — Status, Submitted, Confirmation,
+    Verify&nbsp;by and your Notes are carried across, and the old file is backed up
+    first. Only the site list and pre-filled values are refreshed.</p>
 {% endif %}
 
 <form method="post" action="{{ url_for('worklist_run', slug=slug) }}">

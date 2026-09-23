@@ -1,7 +1,8 @@
-# Never commit real client PII or generated output
-clients/*.yaml
+# Never commit real client PII or generated output.
+# clients/* (not clients/*.yaml) so subfolders — notably clients/_backups/, which
+# holds previous versions of real client files — can never slip in either.
+clients/*
 !clients/_TEMPLATE.yaml
-!clients/example_client.yaml
 output/
 forms/_blank_pdfs/*.pdf
 !forms/_blank_pdfs/demo_redaction.pdf
