@@ -251,6 +251,21 @@ suite points the toolkit at a temporary directory first. The one test that fills
 real Clerk form and checks every coordinate skips unless the county blank PDFs are
 present. Details in `docs/testing.md`.
 
+## Backing up a case
+```bash
+python case_export.py --client clients/lastname_firstname.yaml   # -> exports/
+python case_export.py --all --to D:/encrypted-backups            # every client
+python case_export.py --verify "exports/<file>.zip"              # before you rely on it
+python case_export.py --restore "exports/<file>.zip"             # onto a fresh machine
+```
+One zip per case: the client file, every filled form, the generation log, and a
+manifest with a checksum for each. In the app it's the **Export case** button on the
+filled-forms screen.
+
+**An export is not encrypted.** Python cannot write an encrypted zip, so this is a
+whole client in plaintext in one file — keep it on an encrypted volume and treat
+losing one the way you'd treat losing the laptop.
+
 ## Seeing what's been generated
 Every client row shows a **Filled forms** count. Click it for that client's forms —
 newest first, with the real form name, who it's for, and when it was made. Each one

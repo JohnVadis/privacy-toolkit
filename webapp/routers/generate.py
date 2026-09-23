@@ -11,11 +11,13 @@ from __future__ import annotations
 import io
 import subprocess
 import sys
+from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import (FileResponse, HTMLResponse, RedirectResponse,
                                Response)
 
+import case_export
 import generation_log
 from build_worklist import WORKLIST_FILENAME, build_worklist, load_sites
 from client_context import ClientDataError, person_roles
@@ -192,6 +194,29 @@ async def download_file(slug: str, filename: str):
     path = output_file(client, filename)
     return FileResponse(path, filename=path.name, headers=NO_STORE,
                         media_type="application/octet-stream")
+
+
+@router.get("/clients/{slug}/export", name="export_case")
+async def export_case(slug: str):
+    """The whole case as one file, to put somewhere safe.
+
+    Built in memory and handed straight to the browser: writing it under output/
+    first would leave a second plaintext copy of the case on the machine for no
+    reason, and would show up in the file list as something to send to a county.
+    """
+    slug, client = get_client(slug)
+    try:
+        data, book = case_export.build(client, slug)
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Could not build the export: {exc}")
+
+    headers = dict(NO_STORE)
+    filename = case_export.filename_for(slug)          # ASCII by construction
+    headers["Content-Disposition"] = (
+        f'attachment; filename="{filename}"; '
+        f"filename*=UTF-8''{quote(filename)}")         # RFC 5987, for the pedantic
+    headers["X-Case-Files"] = str(book["file_count"])
+    return Response(content=data, media_type="application/zip", headers=headers)
 
 
 @router.get("/clients/{slug}/files", response_class=HTMLResponse, name="client_files")

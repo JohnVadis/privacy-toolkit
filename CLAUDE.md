@@ -69,6 +69,12 @@ python import_documents.py --client clients/<name>.yaml export.csv --dry-run
 # Build the opt-out worklist spreadsheet (MERGES — never destroys tracked status)
 python build_worklist.py --client clients/<name>.yaml
 
+# Package a case into one file (backup, handover, closing record)
+python case_export.py --client clients/<name>.yaml
+python case_export.py --all --to D:/encrypted-backups
+python case_export.py --verify "exports/<file>.zip"
+python case_export.py --restore "exports/<file>.zip" [--replace]
+
 # See what client data has piled up in trash/ and feedback/, and prune it
 python housekeeping.py                        # report only
 python housekeeping.py --prune --dry-run
@@ -149,6 +155,12 @@ display name, because two clients can share a display name and then share a fold
   blank PDF (by SHA-256), with the library versions that drew it. `verify()` answers
   "is this file still the one the toolkit made?". Never raises — a form that
   generated is worth more than its audit line.
+- `case_export.py` — a whole case as one zip: the client file, every generated file,
+  the generation log, and a manifest with a SHA-256 of each. `verify()` re-hashes an
+  archive, `restore()` puts it back and refuses a damaged one or an existing client.
+  Member paths are checked on restore — a zip can name a member `../../anything`.
+  NOT encrypted: Python's zipfile can't, so the docs say to keep exports on an
+  encrypted volume rather than pretending otherwise.
 - `housekeeping.py` — retention for the two folders that fill with client data as a
   side effect (`trash/`, `feedback/`). Reports by default; prunes only when asked,
   never on a schedule and never at startup.

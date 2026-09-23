@@ -80,11 +80,21 @@ kept and marked, and the previous file is copied to `_worklist_backups/` first. 
 catalog's own text moved to a separate "Site guidance" column so merging is not
 ambiguous about whose note is whose.
 
-### H2. No backup or export
-`clients/` and `output/` exist once, on one machine. An "export case" zip would give
-something to put somewhere safe. **Partly addressed (2026-09-23):** client files are
-now versioned locally in `clients/_backups/<slug>/` on every save, and the repo is
-under git — but that is still one machine, and neither covers `output/`.
+### H2. No backup or export — **DONE (2026-09-23)**
+`case_export.py` packages a case — the client file, every generated file, the
+generation log — into one zip with a manifest hashing each member. `--all` backs up
+every client, `--verify` re-checks an archive before you rely on it, `--restore` puts
+one back (refusing a damaged archive, an existing client without `--replace`, and any
+member whose path points outside the installation). The app has an **Export case**
+button on the filled-forms screen; it builds in memory so no second plaintext copy is
+left behind.
+
+Client files are also versioned locally in `clients/_backups/<slug>/` on every save.
+
+Still true: an export is **not encrypted** — Python's zipfile cannot write one, and
+adding a dependency for it would be a bigger promise than this can keep. The README,
+the in-app notice and the archive's own README all say to keep exports on an encrypted
+volume. If that stops being good enough, `pyzipper` is the route.
 
 ### H3. Flatten output + log generations (was #9) — **half done (2026-09-23)**
 Logging is in: `generation_log.py` writes one line per filled form into

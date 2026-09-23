@@ -8,6 +8,7 @@
     <p class="lede">{{ display_name }} — everything generated so far, newest first.</p>
   </div>
   <a class="btn" href="{{ url_for('client_edit', slug=slug) }}">Edit client</a>
+  <a class="btn" href="{{ url_for('export_case', slug=slug) }}">Export case</a>
   <a class="btn btn-primary" href="{{ url_for('generate_page', slug=slug) }}">Generate more</a>
 </div>
 
@@ -81,6 +82,12 @@
     from which mapping, with a checksum — so a filed document can be traced back
     to what made it.
   </p>
+
+  <p class="gate"><strong>Export case</strong> packages this client's file and
+    everything above into one zip, with a checksum for each — something to keep on an
+    encrypted drive, or to hand over when a matter closes. It holds personal
+    information and is <strong>not itself encrypted</strong>, because a zip written by
+    Python cannot be. Treat losing one the way you'd treat losing this computer.</p>
 {% endif %}
 
 {% endblock %}

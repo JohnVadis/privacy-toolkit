@@ -44,6 +44,9 @@ for previews.
 | `test_webapp_corrections.py` | Hand edits stored against the client, and both drift guards end to end through the route. |
 | `test_webapp_forms.py` | The mapping editor and form importer: that a bad save writes nothing, that an edit can't destroy the rest of the file, and that an upload is judged on contents. |
 | `test_feedback.py` | The Comment feature, and above all that it never sends. |
+| `test_generation_log.py` | That every filing is journalled, that a tampered file is detectable, and that a log failure never costs you the form. |
+| `test_housekeeping.py` | Retention: what gets pruned, what doesn't, and that nothing is ever removed without being asked. |
+| `test_case_export.py` | Export, verify and restore — including that a zip naming a member `../../anything` is refused rather than unpacked. |
 
 ## The golden test
 

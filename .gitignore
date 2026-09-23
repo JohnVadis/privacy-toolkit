@@ -12,6 +12,9 @@ __pycache__/
 venv/
 trash/
 
+# Exported cases are a whole client in one file, in plaintext.
+exports/
+
 # Screenshots taken by the Comment feature show client data
 feedback/
 build/
