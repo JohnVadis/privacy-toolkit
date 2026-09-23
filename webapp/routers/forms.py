@@ -274,8 +274,14 @@ def _editor_response(request, meta, form_key, text, problems, data):
             "preview_client": str(data.get("client") or ""),
             "backups": [p.name for p in mapping_edit.list_backups(form_key)[:5]],
             "saved": False, "imported": False,
-            "pins": _entry_pins(text, meta), "size": _page_size(meta, 1),
+            "pins": _entry_pins(text, meta, EXAMPLE_CLIENT),
+            "size": _page_size(meta, 1),
             "variables": CONTEXT_VARIABLES, "conditions": MARK_CONDITIONS,
+            # The template feeds this to |tojson, and Jinja's Undefined is not
+            # serializable — leaving it out turned every refused save into a 500,
+            # which is precisely when the worker needs the page back with their
+            # work and the reason on it.
+            "example_slug": EXAMPLE_SLUG,
         },
         status_code=422,
     )

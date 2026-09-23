@@ -256,6 +256,12 @@ def _entry_spans(lines: list[str]) -> dict[int, tuple[int, int]]:
     indent = None
     index = -1
     start = 0
+    # Where the entries block stops. It is NOT always the end of the file: a mapping
+    # can carry top-level keys after `entries:` — `tables:` does. Ending the last
+    # entry's span at len(lines) made it swallow them, so rewriting or deleting the
+    # final entry deleted the document table with it, and check_mapping accepted the
+    # result because a mapping without a tables block is still perfectly valid.
+    block_end = len(lines)
     for i, line in enumerate(lines):
         if re.match(r"^\s*entries\s*:", line):
             in_entries = True
@@ -265,6 +271,7 @@ def _entry_spans(lines: list[str]) -> dict[int, tuple[int, int]]:
         stripped = line.lstrip()
         # A non-indented, non-list line ends the entries block.
         if stripped and not line[0].isspace() and not stripped.startswith("-"):
+            block_end = i
             break
         m = re.match(r"^(\s*)-\s", line)
         if m:
@@ -276,7 +283,7 @@ def _entry_spans(lines: list[str]) -> dict[int, tuple[int, int]]:
                 index += 1
                 start = i
     if index >= 0:
-        spans[index] = (start, len(lines))
+        spans[index] = (start, block_end)
 
     # An entry's span must cover its own lines ONLY. These mappings put a group
     # comment above the entries it describes, so a span that ran to the next '-'

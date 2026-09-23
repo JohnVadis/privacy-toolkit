@@ -104,8 +104,10 @@ form-data → client-file layer, create/edit/delete/generate/worklist through th
 app, the document import and row picker, and hand corrections with both drift guards.
 374 tests in all.
 
-Still open: the mapping editor and form-import routes (`webapp/routers/forms.py`) and
-the Comment feature (`feedback.py`) have no tests — both were checked by hand.
+The mapping editor, the form importer and the Comment feature are covered too
+(2026-09-23). 458 tests in all. Writing those found three live bugs — a 500 on every
+refused mapping save, an editor edit that deleted the Clerk form's `tables:` block,
+and colliding comment filenames — all fixed in the same commit.
 
 ### H5. `trash/` is never pruned
 Deleted clients accumulate with their PII.

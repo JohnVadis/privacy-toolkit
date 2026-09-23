@@ -177,10 +177,21 @@ def _window_box(title: str):
 
 
 def save(png: bytes, note: str = "") -> Path:
-    """Write a capture into feedback/ and return where it landed."""
+    """Write a capture into feedback/ and return where it landed.
+
+    The name is unique even within the same second. It used to be the timestamp
+    alone, so two comments filed in quick succession collided: the second
+    overwrote the first's picture AND inherited its .txt, which paired a
+    screenshot with somebody else's words.
+    """
     FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
     stamp = _dt.datetime.now().strftime("%Y-%m-%d_%H%M%S")
     path = FEEDBACK_DIR / f"comment_{stamp}.png"
+    suffix = 2
+    while path.exists() or path.with_suffix(".txt").exists():
+        path = FEEDBACK_DIR / f"comment_{stamp}_{suffix}.png"
+        suffix += 1
+
     path.write_bytes(png)
     if note.strip():
         path.with_suffix(".txt").write_text(note, encoding="utf-8")
