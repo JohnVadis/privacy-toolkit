@@ -15,6 +15,11 @@ same functions.
 
 Current scope: **Hillsborough County, FL**. Four forms wired and verified.
 
+Runs on Windows and macOS. Everything platform-specific goes through one branch —
+`paths._root()` (where user data lives), `webapp.deps.reveal()`, `desktop.problem()`
+and `feedback._print_window` / `_mac_window`. Add a platform by extending those, not
+by scattering `sys.platform` checks; `tests/test_platforms.py` covers the dispatch.
+
 ## Golden rules (do not break these)
 1. **Eligibility is human-verified.** The tool never decides whether a client
    qualifies for a statutory exemption. It fills forms from data it's given.
@@ -84,7 +89,8 @@ python housekeeping.py --prune
 python -m webapp.desktop                # app window; closing it stops the server
 python -m webapp.main --open-browser    # browser instead; prints a URL holding the key
 python -m webapp.main --port 8000       # pin the port (default: OS assigns one)
-# Non-technical path: double-click "Start Privacy Toolkit.bat" (installs, then runs)
+# Non-technical path: double-click the launcher for the platform (installs, then runs)
+#   Windows: "Start Privacy Toolkit.bat"     macOS: "Start Privacy Toolkit.command"
 
 # Hand it to someone else
 python build_exe.py --zip        # standalone Windows app, no Python needed
@@ -149,7 +155,12 @@ display name, because two clients can share a display name and then share a fold
 - `webapp/` — FastAPI + HTMX UI in a desktop window. Imports the engine; no fill logic of its own.
 - `webapp/security.py` — Host / cross-site / session-token gate in front of every request.
 - `webapp/desktop.py` — the pywebview window; server on a background thread. Downloads
-  need `ALLOW_DOWNLOADS=True` or pywebview cancels them silently.
+  need `ALLOW_DOWNLOADS=True` or pywebview cancels them silently. A startup failure is
+  shown in a dialog (MessageBoxW / osascript) because a launched app has no console.
+- macOS notes: a frozen build is a `.app`, so `paths._root()` walks OUT of the bundle —
+  user data beside it, never inside, where a reinstall would erase it. Window capture
+  uses Quartz + `screencapture -l`, which needs Screen Recording permission the first
+  time; pyobjc comes with pywebview on macOS, so there is nothing extra to install.
 - `generation_log.py` — one JSONL line per filled form, in
   `output/<client>/.generation-log.jsonl`: what was produced, from which mapping and
   blank PDF (by SHA-256), with the library versions that drew it. `verify()` answers

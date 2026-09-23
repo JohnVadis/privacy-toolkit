@@ -109,6 +109,35 @@ def output_file(client: dict, filename: str) -> Path:
     return path
 
 
+def reveal(path) -> None:
+    """Open the folder holding a file, with the file selected where possible.
+
+    One implementation for both routers: a platform quirk fixed here is fixed
+    everywhere. Nothing here is essential — a file manager that won't open must
+    never break the page that called it.
+    """
+    import subprocess
+    import sys
+
+    try:
+        path = Path(path)
+        if sys.platform == "win32":
+            # Explorer's /select, needs the path QUOTED, and a list argument gets
+            # quoted in a way it won't parse — with a space anywhere in the path it
+            # silently opens Documents instead. A single command-line string is the
+            # form that works. No shell is involved, and the caller has already
+            # confirmed the path; '"' can't appear in it.
+            if '"' in str(path):
+                return
+            subprocess.Popen(f'explorer /select,"{path}"')
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", "-R", str(path)])
+        else:
+            subprocess.Popen(["xdg-open", str(path.parent)])
+    except Exception:
+        pass
+
+
 def collector() -> tuple[list, callable]:
     """A `report` sink for the engine.
 

@@ -5,3 +5,7 @@
 *.pdf binary
 *.xlsx binary
 *.png binary
+
+# A .command with CRLF fails on macOS with "bad interpreter" — force LF.
+*.command text eol=lf
+*.sh text eol=lf

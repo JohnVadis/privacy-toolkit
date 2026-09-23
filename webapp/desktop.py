@@ -33,25 +33,49 @@ MIN_SIZE = (900, 600)
 READY_TIMEOUT = 30.0
 ICON = BUNDLED / "webapp" / "static" / "toolkit.ico"
 
-REPAIR_HINT = ('Double-click "Start Privacy Toolkit.bat" in the toolkit folder — '
-               "it repairs the installation and reports what went wrong.")
+# The hint is built per-platform by _repair_hint(); the launchers differ.
 
 
 def problem(message: str) -> None:
     """Report a startup failure so it is visible even with no console.
 
-    The desktop shortcut runs pythonw.exe, which has no console at all: a plain
-    print() here would vanish and the worker would see nothing happen. A message
-    box is the only thing they will actually get.
+    Launched from a shortcut the app has no console at all — pythonw.exe on
+    Windows, a double-clicked .app on macOS — so a plain print() vanishes and the
+    worker sees nothing happen at all. A dialog is the only thing they will get.
     """
     print(message, file=sys.stderr)
+    body = f"{message}\n\n{_repair_hint()}"
     try:
-        import ctypes
+        if sys.platform == "win32":
+            import ctypes
 
-        ctypes.windll.user32.MessageBoxW(
-            0, f"{message}\n\n{REPAIR_HINT}", WINDOW_TITLE, 0x10)  # MB_ICONERROR
+            ctypes.windll.user32.MessageBoxW(0, body, WINDOW_TITLE, 0x10)  # MB_ICONERROR
+        elif sys.platform == "darwin":
+            import subprocess
+
+            # osascript is part of macOS; nothing to install and no window server
+            # assumptions beyond the one the app already needs.
+            script = (f'display dialog {_as_applescript(body)} '
+                      f'with title {_as_applescript(WINDOW_TITLE)} '
+                      'buttons {"OK"} default button "OK" with icon stop')
+            subprocess.run(["osascript", "-e", script], capture_output=True, timeout=60)
     except Exception:
-        pass  # not Windows, or no window station — the stderr line stands
+        pass  # no window station, or a locked screen — the stderr line stands
+
+
+def _as_applescript(text: str) -> str:
+    """A quoted AppleScript string. Backslashes and quotes both need escaping."""
+    escaped = text.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
+def _repair_hint() -> str:
+    """Which launcher to point the worker at, for the platform they're on."""
+    launcher = ("Start Privacy Toolkit.command" if sys.platform == "darwin"
+                else "Start Privacy Toolkit.bat")
+    verb = "Double-click" if sys.platform != "darwin" else "Open"
+    return (f"{verb} \"{launcher}\" in the toolkit folder — "
+            "it repairs the installation and reports what went wrong.")
 
 
 def _wait_until_started(server, timeout: float = READY_TIMEOUT) -> bool:

@@ -24,12 +24,22 @@ def _root() -> Path:
     Frozen into an .exe, that is the folder holding the .exe — NOT the temp folder
     PyInstaller unpacks into, which is deleted on exit and would take every client
     file with it. Running from source it is this file's folder, as before.
+
+    On macOS a frozen build is `Privacy Toolkit.app/Contents/MacOS/exe`, and the
+    folder holding the executable is INSIDE the bundle. Client files written there
+    would sit inside the app — lost on every reinstall, and unwritable once the app
+    is signed or quarantined. So the bundle is walked out of, giving the same rule
+    as Windows: data lives beside the application, not within it.
     """
     override = os.environ.get(HOME_ENV)
     if override:
         return Path(override).resolve()
     if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent
+        exe_dir = Path(sys.executable).resolve().parent
+        for parent in (exe_dir, *exe_dir.parents):
+            if parent.suffix == ".app":
+                return parent.parent
+        return exe_dir
     return Path(__file__).resolve().parent
 
 

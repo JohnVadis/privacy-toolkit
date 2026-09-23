@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """
-build_exe.py — build a Windows app the client can run without installing Python.
+build_exe.py — build an app the client can run without installing Python.
 
     python build_exe.py            # build it
     python build_exe.py --zip      # build it and zip the folder
 
-Produces dist/Privacy Toolkit/ containing "Privacy Toolkit.exe" plus the files the
-toolkit reads and writes. The client unzips it and double-clicks the .exe. Nothing to
-install, no internet needed.
+On Windows this produces dist/Privacy Toolkit/ containing "Privacy Toolkit.exe";
+on macOS, dist/Privacy Toolkit/ containing "Privacy Toolkit.app". Either way the
+client unzips it and double-clicks. Nothing to install, no internet needed.
+
+PyInstaller does not cross-compile: a Mac build has to be made ON a Mac and a
+Windows build on Windows. Run this on each.
 
 Two things shape the layout:
 
@@ -32,6 +35,13 @@ from paths import ROOT
 APP_NAME = "Privacy Toolkit"
 DIST = ROOT / "dist"
 BUILD = ROOT / "build"
+
+MACOS = sys.platform == "darwin"
+BUNDLE_ID = "com.qvadis.privacytoolkit"
+
+# What PyInstaller actually produces, per platform. On macOS --windowed yields a
+# .app bundle, and the .app is the thing to ship.
+APP_FILE = f"{APP_NAME}.app" if MACOS else f"{APP_NAME}.exe"
 
 # Shipped inside the executable: read-only, never edited by the user.
 BUNDLED_DATA = [
@@ -58,8 +68,12 @@ HIDDEN = [
     "uvicorn.logging", "uvicorn.loops.auto", "uvicorn.protocols.http.auto",
     "uvicorn.protocols.websockets.auto", "uvicorn.lifespan.on",
     "pypdfium2", "pdfplumber", "reportlab.pdfgen.canvas", "openpyxl",
-    "PIL.ImageGrab", "webview.platforms.edgechromium", "webview.platforms.winforms",
+    "PIL.ImageGrab",
 ]
+
+# The webview backend differs, and PyInstaller only finds the one it can see.
+HIDDEN += (["webview.platforms.cocoa"] if MACOS
+           else ["webview.platforms.edgechromium", "webview.platforms.winforms"])
 
 EXCLUDE = ["tkinter", "matplotlib", "numpy", "pytest", "PyInstaller", "pymupdf", "fitz"]
 
@@ -71,10 +85,17 @@ def run_pyinstaller() -> None:
         "--noconfirm", "--clean",
         "--name", APP_NAME,
         "--windowed",                      # no console window behind the app
-        "--icon", str(ROOT / "webapp" / "static" / "toolkit.ico"),
-        "--contents-directory", "_internal",
         str(ROOT / "webapp" / "desktop.py"),
     ]
+    icon = _icon_file()
+    if icon:
+        args += ["--icon", str(icon)]
+    if MACOS:
+        # Without an identifier macOS treats each rebuild as a different app and
+        # re-asks for Screen Recording permission every time.
+        args += ["--osx-bundle-identifier", BUNDLE_ID]
+    else:
+        args += ["--contents-directory", "_internal"]
     for src, dest in BUNDLED_DATA:
         args += ["--add-data", f"{ROOT / src}{sep}{dest}"]
     for name in HIDDEN:
@@ -87,8 +108,20 @@ def run_pyinstaller() -> None:
     subprocess.run(args, check=True, cwd=ROOT)
 
 
+def _icon_file():
+    """The icon for this platform, or None — a missing icon must not fail a build."""
+    name = "toolkit.icns" if MACOS else "toolkit.ico"
+    path = ROOT / "webapp" / "static" / name
+    if path.is_file():
+        return path
+    if MACOS:
+        print(f"  note: no {name} — building without a custom icon.")
+        print("        (make one with: iconutil -c icns toolkit.iconset)")
+    return None
+
+
 def add_user_files(app_dir: Path) -> None:
-    """Put the editable files beside the .exe."""
+    """Put the editable files beside the app."""
     for rel in BESIDE:
         dest = app_dir / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -141,14 +174,26 @@ shortcut to your Desktop."""), encoding="utf-8")
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Build the no-Python-needed Windows app.")
+    ap = argparse.ArgumentParser(
+        description="Build the no-Python-needed app for whichever OS you run this on.")
     ap.add_argument("--zip", action="store_true")
     args = ap.parse_args()
 
     run_pyinstaller()
     app_dir = DIST / APP_NAME
-    if not (app_dir / f"{APP_NAME}.exe").is_file():
-        raise SystemExit("PyInstaller did not produce an .exe")
+    produced = DIST / APP_FILE if MACOS else app_dir / APP_FILE
+    if not produced.exists():
+        raise SystemExit(f"PyInstaller did not produce {APP_FILE}")
+
+    if MACOS:
+        # Ship a FOLDER holding the .app plus the editable files, so user data sits
+        # beside the bundle (paths._root walks out of it) rather than inside, where
+        # a reinstall would erase it and a signed app could not write at all.
+        app_dir.mkdir(parents=True, exist_ok=True)
+        target = app_dir / APP_FILE
+        if target.exists():
+            shutil.rmtree(target)
+        shutil.move(str(produced), str(target))
     add_user_files(app_dir)
 
     total = sum(f.stat().st_size for f in app_dir.rglob("*") if f.is_file())

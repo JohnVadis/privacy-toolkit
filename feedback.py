@@ -35,15 +35,18 @@ def capture(title: str = WINDOW_TITLE) -> bytes:
     Grabs the real window rather than rendering the DOM, so whatever is actually on
     screen is captured — including a PDF shown in the built-in reader, which no
     HTML-to-canvas trick can reach.
-    """
-    from PIL import ImageGrab
 
-    # Ask the window to draw itself. A screen grab would capture whatever happens to
-    # be on top of the app — a terminal, a file browser — and raising the window
-    # first doesn't help, because Windows refuses a focus change requested by a
-    # background process. PrintWindow reads the window's own buffer instead.
-    image = _print_window(title)
+    Capturing the WINDOW rather than the screen matters here beyond tidiness: a
+    full-screen grab takes in whatever else the worker has open, and this picture is
+    about to be attached to an email. Each platform has its own way of asking a
+    single window to draw itself; the screen grab is the last resort.
+    """
+    image = _print_window(title)          # Windows: PrintWindow
     if image is None:
+        image = _mac_window(title)        # macOS: Quartz + screencapture
+    if image is None:
+        from PIL import ImageGrab
+
         box = _window_box(title)
         image = (ImageGrab.grab(bbox=box, all_screens=True) if box
                  else ImageGrab.grab(all_screens=True))
@@ -53,6 +56,55 @@ def capture(title: str = WINDOW_TITLE) -> bytes:
     buf = io.BytesIO()
     image.convert("RGB").save(buf, format="PNG")
     return buf.getvalue()
+
+
+def _mac_window(title: str):
+    """Capture one window on macOS. PIL Image, or None.
+
+    `screencapture -l <window id>` is part of the OS and captures a single window
+    including its shadow-free contents; Quartz finds the id by the window's title.
+    pyobjc ships with pywebview on macOS, so both are already present.
+
+    macOS will ask for Screen Recording permission the first time. Until it is
+    granted the capture comes back empty rather than failing, which is why an
+    all-but-blank result is rejected here instead of being attached to an email.
+    """
+    if sys.platform != "darwin":
+        return None
+    try:
+        import subprocess
+        import tempfile
+
+        from PIL import Image
+        from Quartz import (CGWindowListCopyWindowInfo, kCGNullWindowID,
+                            kCGWindowListOptionOnScreenOnly)
+
+        window_id = None
+        for info in CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly,
+                                               kCGNullWindowID) or []:
+            if str(info.get("kCGWindowName") or "") == title:
+                window_id = info.get("kCGWindowNumber")
+                break
+        if window_id is None:
+            return None
+
+        with tempfile.TemporaryDirectory() as tmp:
+            shot = Path(tmp) / "window.png"
+            # -o drops the window shadow, -x silences the shutter sound.
+            result = subprocess.run(
+                ["screencapture", "-l", str(window_id), "-o", "-x", str(shot)],
+                capture_output=True, timeout=20)
+            if result.returncode != 0 or not shot.is_file():
+                return None
+            image = Image.open(shot)
+            image.load()
+
+        # A denied Screen Recording permission yields a tiny or empty image.
+        if image.width < 50 or image.height < 50:
+            return None
+        return image
+    except Exception:
+        return None
 
 
 def _print_window(title: str):

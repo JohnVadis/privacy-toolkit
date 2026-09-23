@@ -63,6 +63,28 @@ open and back up. Nothing to install and no internet needed. Windows shows a
 willing to install it. Both build from an allowlist and refuse to finish if any value
 from a real client file appears in the output.
 
+## Which platform
+Windows and macOS both. The difference is only the launcher:
+
+| | |
+|---|---|
+| Windows | double-click **Start Privacy Toolkit.bat** |
+| macOS | double-click **Start Privacy Toolkit.command** |
+
+Either one builds a private Python environment on first run (needs internet once,
+about a minute) and then opens the app. On macOS, if Finder refuses to run the
+launcher, right-click it and choose **Open** — or run
+`chmod +x "Start Privacy Toolkit.command"` once.
+
+Two macOS-only things worth knowing:
+
+- The **Comment** feature captures the app's window, and macOS asks for Screen
+  Recording permission the first time (System Settings → Privacy & Security → Screen
+  Recording). Until it's granted, the capture is refused rather than a blank image
+  being attached to an email.
+- A packaged `.app` keeps client data in the folder **beside** the app, not inside the
+  bundle — so a reinstall never takes the cases with it.
+
 ## The desktop app (easiest way in)
 
 **First time:** double-click `Start Privacy Toolkit.bat`. It builds a private Python

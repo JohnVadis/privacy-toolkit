@@ -47,6 +47,7 @@ for previews.
 | `test_generation_log.py` | That every filing is journalled, that a tampered file is detectable, and that a log failure never costs you the form. |
 | `test_housekeeping.py` | Retention: what gets pruned, what doesn't, and that nothing is ever removed without being asked. |
 | `test_case_export.py` | Export, verify and restore — including that a zip naming a member `../../anything` is refused rather than unpacked. |
+| `test_platforms.py` | The Windows/macOS/Linux branches: where a frozen build keeps client data, which dialog a startup failure uses, how a window is captured, and how a file is revealed. Runs anywhere with `sys.platform` patched — what the OS then does with the command is verified by running the app there. |
 
 ## The golden test
 

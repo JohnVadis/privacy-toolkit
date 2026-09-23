@@ -9,8 +9,6 @@ are a PNG preview, a file download, and a link the worker clicks themselves.
 from __future__ import annotations
 
 import io
-import subprocess
-import sys
 from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Request
@@ -23,7 +21,8 @@ from build_worklist import WORKLIST_FILENAME, build_worklist, load_sites
 from client_context import ClientDataError, person_roles
 from fill_forms import fill_client, generated_files, list_mappings, output_dir
 from validate_client import errors, validate_client, warnings
-from webapp.deps import collector, get_client, output_file, templates, url_for
+from webapp.deps import (collector, get_client, output_file, reveal,
+                         templates, url_for)
 from webapp.formparse import parse_nested
 
 router = APIRouter()
@@ -264,23 +263,7 @@ async def reveal_file(request: Request, slug: str, filename: str):
     only; elsewhere this is a no-op and the page just reloads.
     """
     slug, client = get_client(slug)
-    path = output_file(client, filename)
-    try:
-        if sys.platform == "win32":
-            # Explorer's /select, needs the path QUOTED, and a list argument gets
-            # quoted in a way it won't parse — with a space anywhere in the path it
-            # silently opens Documents instead. A single command-line string is the
-            # form that works. No shell is involved; `path` has already passed the
-            # output-folder guard, and '"' can't appear in it.
-            if '"' in str(path):
-                raise ValueError("unexpected quote in path")
-            subprocess.Popen(f'explorer /select,"{path}"')
-        elif sys.platform == "darwin":
-            subprocess.Popen(["open", "-R", str(path)])
-        else:
-            subprocess.Popen(["xdg-open", str(path.parent)])
-    except Exception:
-        pass  # a file manager that won't open must not break the page
+    reveal(output_file(client, filename))
     return RedirectResponse(url_for(request, "client_files", slug=slug), status_code=303)
 
 

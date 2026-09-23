@@ -32,6 +32,7 @@ DEST_NAME = "Privacy Toolkit (test copy)"
 # Everything the app needs to run, and nothing else.
 FILES = [
     "Start Privacy Toolkit.bat",
+    "Start Privacy Toolkit.command",     # macOS launcher (keep the exec bit)
     "requirements.txt",
     "sites.yaml",
     # engine

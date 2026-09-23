@@ -10,14 +10,12 @@ from __future__ import annotations
 
 import base64
 import binascii
-import subprocess
-import sys
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response
 
 import feedback as feedback_engine
-from webapp.deps import templates, url_for
+from webapp.deps import reveal, templates, url_for
 from webapp.formparse import parse_nested
 
 router = APIRouter()
@@ -77,7 +75,7 @@ async def feedback_send(request: Request):
     url = feedback_engine.compose_url(comment, saved)
     opened = _open_externally(url)
     if saved:
-        _reveal(saved)
+        reveal(saved)
     _pending.pop("png", None)
 
     return templates.TemplateResponse(
@@ -113,18 +111,3 @@ def _open_externally(url: str) -> bool:
         return bool(webbrowser.open(url))
     except Exception:
         return False
-
-
-def _reveal(path) -> None:
-    """Open the folder holding the screenshot so it can be dragged into the email."""
-    try:
-        if sys.platform == "win32":
-            if '"' in str(path):
-                return
-            subprocess.Popen(f'explorer /select,"{path}"')
-        elif sys.platform == "darwin":
-            subprocess.Popen(["open", "-R", str(path)])
-        else:
-            subprocess.Popen(["xdg-open", str(path.parent)])
-    except Exception:
-        pass

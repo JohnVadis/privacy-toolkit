@@ -32,7 +32,7 @@ def no_desktop(monkeypatch):
     monkeypatch.setattr(router.feedback_engine, "capture", lambda *a, **k: PNG)
     monkeypatch.setattr(router, "_open_externally",
                         lambda url: opened.append(url) or True)
-    monkeypatch.setattr(router, "_reveal", lambda path: revealed.append(path))
+    monkeypatch.setattr(router, "reveal", lambda path: revealed.append(path))
     return {"opened": opened, "revealed": revealed}
 
 
