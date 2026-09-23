@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Delete {{ display_name }}?{% endblock %}
+{% block content %}
+
+<h1>Delete this client?</h1>
+<p class="lede">Check the details below before you confirm.</p>
+
+<div class="card">
+  <h2 style="margin-top:0">{{ display_name }}</h2>
+  <p class="muted mono">clients/{{ slug }}.yaml</p>
+
+  <h3 style="margin-top:1.25rem">What gets removed</h3>
+  <ul>
+    <li>The client's details — name, people, addresses, exemption.</li>
+    {% if preview.generated %}
+      <li><strong>{{ preview.generated | length }}</strong> generated
+        file{{ '' if preview.generated | length == 1 else 's' }} in
+        <span class="mono">output/{{ preview.output_dir.name }}/</span>:
+        <ul class="muted">
+          {% for name in preview.generated %}<li class="mono">{{ name }}</li>{% endfor %}
+        </ul>
+      </li>
+    {% else %}
+      <li class="muted">No forms or worklists have been generated for this client yet.</li>
+    {% endif %}
+  </ul>
+</div>
+
+<p class="note note-ok"><strong>This can be undone.</strong>
+  Nothing is erased — everything is moved into the <span class="mono">trash</span> folder
+  next to the app, so it can be put back if this was a mistake. To get rid of it for good,
+  empty that folder yourself.</p>
+
+<form method="post" action="{{ url_for('client_delete', slug=slug) }}">
+  <input type="hidden" name="confirm" value="yes">
+  <div class="actions-bar">
+    <a class="btn btn-primary" href="{{ url_for('client_edit', slug=slug) }}">No, keep this client</a>
+    <button type="submit" class="danger">Yes, delete {{ display_name }}</button>
+  </div>
+</form>
+
+{% endblock %}

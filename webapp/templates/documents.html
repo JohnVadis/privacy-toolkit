@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}Documents — {{ display_name }}{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>Documents to redact</h1>
+    <p class="lede">{{ display_name }} — the recorded documents the Clerk form names.
+      Import the results of an Official Records search, then check them.</p>
+  </div>
+  <a class="btn" href="{{ url_for('client_edit', slug=slug) }}">Edit client</a>
+  <a class="btn btn-primary" href="{{ url_for('generate_page', slug=slug) }}">Generate forms</a>
+</div>
+
+{% if done %}<div class="note note-ok"><strong>Saved.</strong> {{ done }}.</div>{% endif %}
+{% if error %}<div class="note note-error"><strong>Nothing was imported.</strong> {{ error }}</div>{% endif %}
+
+{% if warnings %}
+  <div class="note note-warn">
+    <strong>Worth knowing before you generate.</strong>
+    <ul>{% for w in warnings %}<li>{{ w.message }}</li>{% endfor %}</ul>
+  </div>
+{% endif %}
+
+{% if preview %}
+  {# Parsed, not saved. Nothing is written until rows are ticked and confirmed. #}
+  <div class="card" id="picker" data-total="{{ preview.count }}">
+    <h2>Pick the documents that are this client's</h2>
+    <p class="hint">
+      {{ preview.count }} row(s) read from the columns: {{ preview.columns|join(', ') }}.
+      {% if preview.ignored %}Ignored: {{ preview.ignored|join(', ') }}.{% endif %}
+      {% if preview.skipped %}{{ preview.skipped }} row(s) had no instrument number and no
+      book/page, so they were left out.{% endif %}
+    </p>
+    {% if preview.has_parties %}
+      <p class="gate"><strong>A name search matches a name, not a person.</strong>
+        Tick only the records that are actually this client's — the form redacts exactly
+        what it names. The party names are shown to help you choose and are not saved.</p>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('documents_import', slug=slug) }}">
+      <input type="hidden" name="action" value="save">
+      {# A textarea, not a hidden input: attribute values mangle the line breaks
+         this CSV is made of. #}
+      <textarea name="text" hidden>{{ preview.text }}</textarea>
+      <input type="hidden" name="list" value="{{ preview.list }}">
+      {% if preview.replace %}<input type="hidden" name="replace" value="1">{% endif %}
+      {% for p in preview.persons %}<input type="hidden" name="persons" value="{{ p }}">{% endfor %}
+
+      <div class="picker-tools">
+        <label for="pick-filter">Show rows containing</label>
+        <input type="text" id="pick-filter" autocomplete="off"
+               placeholder="{% if preview.has_parties %}a name, e.g. {{ display_name.split(',')[0] }}{% else %}an instrument number or title{% endif %}">
+        <button type="button" class="btn btn-small" data-pick="all">Tick shown</button>
+        <button type="button" class="btn btn-small" data-pick="none">Untick shown</button>
+        <span class="muted" id="pick-count"></span>
+      </div>
+
+      <div class="table-wrap">
+        <table id="pick-table">
+          <thead><tr>
+            <th scope="col"><span class="muted">Use</span></th>
+            <th scope="col">Instrument Number</th><th scope="col">Book</th>
+            <th scope="col">Page</th><th scope="col">Document Title</th>
+            {% if preview.has_parties %}<th scope="col">Parties</th>{% endif %}
+            <th scope="col">Recorded</th>
+          </tr></thead>
+          <tbody>
+            {% for p in preview.rows %}
+            <tr>
+              <td><label class="check"><input type="checkbox" name="pick" value="{{ p.i }}"
+                     aria-label="Use {{ p.row.instrument_number or p.row.title }}"></label></td>
+              <td class="mono">{{ p.row.instrument_number }}</td>
+              <td class="mono">{{ p.row.book }}</td>
+              <td class="mono">{{ p.row.page }}</td>
+              <td>{{ p.row.title }}
+                {% if p.known %}<br><span class="muted">already on file</span>{% endif %}</td>
+              {% if preview.has_parties %}
+                <td class="muted">{{ p.row.grantor }}{% if p.row.grantor and p.row.grantee %}
+                  → {% endif %}{{ p.row.grantee }}</td>
+              {% endif %}
+              <td class="muted">{{ p.row.recorded }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted">Ticked rows are added to the <strong>{{ preview.list }}</strong>
+        list. One already on file is updated, not duplicated.
+        {% if preview.replace %}Everything currently on that list is replaced.{% endif %}</p>
+      <p>
+        <button type="submit" class="btn btn-primary">Import the ticked documents</button>
+        <a class="btn" href="{{ url_for('documents_page', slug=slug) }}">Cancel</a>
+      </p>
+    </form>
+  </div>
+{% endif %}
+
+<div class="card">
+  <h2>Import a record list</h2>
+  <p class="hint">
+    A CSV from the Clerk's Official Records search, or the results grid copied and
+    pasted. The first row must be the column headings — <span class="mono">Instrument
+    Number</span>, <span class="mono">Book</span>, <span class="mono">Page</span>,
+    <span class="mono">Document Title</span>, and common variants (CFN, OR Book, Doc
+    Type) are understood. Nothing is sent anywhere; the file is read on this computer.
+  </p>
+  <form method="post" action="{{ url_for('documents_import', slug=slug) }}"
+        enctype="multipart/form-data">
+    <label for="doc-file">CSV file</label>
+    <input type="file" id="doc-file" name="file" accept=".csv,.tsv,.txt,text/csv,text/plain">
+
+    <label for="doc-text">…or paste the rows</label>
+    <textarea id="doc-text" name="text" rows="6"
+              placeholder="Instrument Number,Book,Page,Document Title"></textarea>
+
+    <fieldset>
+      <legend>Which list</legend>
+      {% for l in lists %}
+        <label class="check">
+          <input type="radio" name="list" value="{{ l }}" {% if loop.first %}checked{% endif %}>
+          {% if l == 'redact' %}Documents to be redacted{% else %}Prior redactions to be released{% endif %}
+        </label>
+      {% endfor %}
+    </fieldset>
+
+    {% if roles|length > 1 %}
+    <fieldset>
+      <legend>Only for these people</legend>
+      <p class="hint" style="margin-top:0">Leave unchecked to list them on everyone's form.</p>
+      {% for r in roles %}
+        <label class="check"><input type="checkbox" name="persons" value="{{ r }}">
+          {{ r.replace('_', ' ') }}</label>
+      {% endfor %}
+    </fieldset>
+    {% endif %}
+
+    <label class="check"><input type="checkbox" name="replace" value="1">
+      Replace the existing rows on that list instead of adding to them</label>
+
+    <p><button type="submit" class="btn btn-primary">Read the file</button></p>
+  </form>
+</div>
+
+<div class="card">
+  <h2>On file — {{ counts.redact }} to redact, {{ counts.release }} to release</h2>
+  {% if capacities %}
+    {% for c in capacities %}
+      <p class="hint">
+        {{ c.form_key.replace('_', ' ') }} prints
+        {%- for t in c.tables %}
+          {{ ' ' }}{{ t.rows }} {{ t.list }} row{{ '' if t.rows == 1 else 's' }}
+          (the rest on Attachment {{ t.attachment }}){{ ', and' if not loop.last }}
+        {%- endfor %}.
+      </p>
+    {% endfor %}
+  {% endif %}
+
+  {% if not rows %}
+    <p class="muted">Nothing imported yet. The form's document table will print blank,
+      to be written in at the Clerk's office.</p>
+  {% else %}
+    <form method="post" action="{{ url_for('documents_save', slug=slug) }}">
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th scope="col">Instrument Number</th><th scope="col">Book</th>
+            <th scope="col">Page</th><th scope="col">Document Title</th>
+            <th scope="col">List</th><th scope="col">Remove</th>
+          </tr></thead>
+          <tbody>
+            {% for i, r in rows %}
+            <tr>
+              <td class="mono">{{ r.instrument_number }}</td>
+              <td class="mono">{{ r.book }}</td>
+              <td class="mono">{{ r.page }}</td>
+              <td>{{ r.title }}
+                {% if r.persons %}<br><span class="muted">only:
+                  {{ r.persons|join(', ')|replace('_', ' ') }}</span>{% endif %}
+              </td>
+              <td>
+                <select name="rows[{{ i }}][list]" aria-label="List for row {{ i + 1 }}">
+                  {% for l in lists %}
+                    <option value="{{ l }}" {% if r.list == l %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td>
+                <label class="check"><input type="checkbox" name="rows[{{ i }}][remove]"
+                       value="1" aria-label="Remove row {{ i + 1 }}"></label>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p><button type="submit" class="btn">Save changes</button></p>
+    </form>
+    <p class="muted">Removing a row here only takes it off this client's list. It does
+      not change anything at the Clerk's office.</p>
+  {% endif %}
+</div>
+
+{% if preview %}
+  <script src="{{ url_for('static', path='/documents.js') }}" defer></script>
+{% endif %}
+
+{% endblock %}

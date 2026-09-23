@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Send a comment{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>Send a comment</h1>
+    <p class="lede">Mark up what you're talking about, write a note, and it opens in
+      your email to {{ to }}.</p>
+  </div>
+  <a class="btn" href="{{ url_for('client_list') }}">← Back</a>
+</div>
+
+{% if sent %}
+  <div class="note note-ok">
+    <strong>Your email is open{{ ' in your browser' if sent == 'ok' else '' }}.</strong>
+    {% if saved_name %}
+      <p style="margin:0.5rem 0 0">The screenshot was saved as
+        <span class="mono">{{ saved_name }}</span> and its folder has been opened —
+        drag it into the email to attach it. No mail service lets a link attach a file,
+        so that last step is yours.</p>
+    {% endif %}
+    {% if sent == 'manual' %}
+      <p style="margin:0.5rem 0 0">Your browser didn't open by itself.
+        <a href="{{ compose_url }}" target="_blank" rel="noopener noreferrer">Open the
+        email here</a>.</p>
+    {% endif %}
+  </div>
+  <p><a class="btn btn-primary" href="{{ url_for('client_list') }}">Done</a></p>
+
+{% elif not has_capture %}
+  <div class="card empty">
+    <p>No screenshot yet.</p>
+    <p class="muted">Go to the screen you want to comment on, then press
+      <strong>Comment</strong> at the top of the page.</p>
+    <p><a class="btn btn-primary" href="{{ url_for('client_list') }}">Back to clients</a></p>
+  </div>
+
+{% else %}
+  <p class="gate"><strong>This picture may show client details.</strong>
+    Use <em>Hide</em> to black anything out before you send it — the black boxes are
+    burned into the saved picture, not just laid over it. Nothing is sent until you
+    press send in your own email.</p>
+
+  <form method="post" action="{{ url_for('feedback_send') }}" id="feedback-form">
+    <input type="hidden" name="image" id="image-data">
+
+    <div class="editor-bar">
+      <button type="button" class="btn btn-small btn-primary" data-tool="highlight">Highlight</button>
+      <button type="button" class="btn btn-small" data-tool="hide">Hide</button>
+      <span class="bar-sep"></span>
+      <button type="button" class="btn btn-small btn-quiet" id="undo-btn">Undo</button>
+      <button type="button" class="btn btn-small btn-quiet" id="clear-btn">Clear marks</button>
+      <span class="spacer"></span>
+      <span class="muted" id="marks-note">Drag on the picture to mark it</span>
+    </div>
+
+    <div class="shot-wrap">
+      <canvas id="shot" aria-label="Screenshot of the app; drag to mark areas"></canvas>
+    </div>
+
+    <fieldset>
+      <legend>Your comment</legend>
+      <div class="field">
+        <label for="comment">What would you like to say?</label>
+        <textarea id="comment" name="comment" rows="5" maxlength="4000"
+                  placeholder="What's wrong, or what would help?" required></textarea>
+      </div>
+      <div class="actions-bar">
+        <button type="submit" class="primary">Open email to {{ to }}</button>
+        <a class="btn btn-quiet" href="{{ url_for('client_list') }}">Cancel</a>
+      </div>
+    </fieldset>
+  </form>
+
+  <script>window.FEEDBACK_IMAGE = {{ url_for('feedback_image') | tojson }};</script>
+  <script src="{{ url_for('static', path='/feedback.js') }}" defer></script>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Opt-out worklist — {{ display_name }}{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>Opt-out worklist</h1>
+    <p class="lede">{{ display_name }} — a spreadsheet pre-filled with the values each site asks
+      for, plus status columns to track the work.</p>
+  </div>
+  <a class="btn" href="{{ url_for('client_files', slug=slug) }}">Filled forms</a>
+  <a class="btn" href="{{ url_for('generate_page', slug=slug) }}">Generate forms</a>
+</div>
+
+<p class="gate"><strong>Prepared, not submitted.</strong> These sites use CAPTCHAs, account
+  creation and email verification, and each has its own terms of service. The toolkit fills in
+  the values and tracks status; a person does the clicking and the submitting.</p>
+
+{% if just_built %}
+  <p class="note note-ok"><strong>Worklist built.</strong>
+    Written to <span class="mono">{{ output_rel }}/{{ built }}</span>.</p>
+{% endif %}
+
+<form method="post" action="{{ url_for('worklist_run', slug=slug) }}">
+  <fieldset>
+    <legend>Build</legend>
+    <div class="grid two">
+      <div class="field">
+        <label for="person">Pre-fill values for</label>
+        <select id="person" name="person">
+          {% for p in people %}
+            <option value="{{ p.role }}" {% if person == p.role %}selected{% endif %}>
+              {{ p.name }} ({{ p.role.replace('_', ' ') }})</option>
+          {% endfor %}
+        </select>
+        <p class="hint">Sites ask for one person's details at a time.</p>
+      </div>
+    </div>
+    <div class="actions-bar">
+      <button type="submit" class="primary">{{ 'Rebuild worklist' if built else 'Build worklist' }}</button>
+      {% if built %}
+        <a class="btn" href="{{ url_for('download_file', slug=slug, filename=built) }}" download>
+          Download .xlsx</a>
+      {% endif %}
+    </div>
+  </fieldset>
+</form>
+
+<h2>Sites in the catalog</h2>
+<p class="lede">Read-only view of <span class="mono">sites.yaml</span>. Edit that file to change
+  what lands in the spreadsheet.</p>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Site</th>
+        <th scope="col">Category</th>
+        <th scope="col">Values it asks for</th>
+        <th scope="col">Agent OK?</th>
+        <th scope="col">Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in sites %}
+      <tr>
+        <td>
+          <strong>{{ s.get('name') or s.get('key') }}</strong><br>
+          {# Opened by the worker, deliberately. The app never requests these itself. #}
+          <a class="muted mono" href="{{ s.get('opt_out_url') }}"
+             target="_blank" rel="noopener noreferrer external">{{ s.get('opt_out_url') }}</a>
+        </td>
+        <td>{{ (s.get('category') or '').replace('_', ' ') }}</td>
+        <td>
+          {% for n in s.get('needs') or [] %}<span class="tag tag-var">{{ n }}</span>{% endfor %}
+        </td>
+        <td>{{ 'yes' if s.get('supports_agent') else 'no' }}</td>
+        <td class="muted">{{ s.get('notes') or '' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

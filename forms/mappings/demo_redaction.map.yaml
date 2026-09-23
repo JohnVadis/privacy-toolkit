@@ -1,0 +1,23 @@
+# Mapping for 'demo_redaction'. Edit each field ONCE, then reuse for every client.
+# Variables (from:) -> full_name first_name middle_name last_name suffix dob phone email
+#   home_line1 home_line2 home_city home_county home_state home_zip home_full
+#   case_number case_display_name agent_name agent_email exemption_code exemption_title exemption_cite today
+form_key: demo_redaction
+title: "Demo redaction request (example form — delete before real use)"
+county: "(demo)"
+pdf: forms/_blank_pdfs/demo_redaction.pdf
+fields:
+  "Name":
+    { from: full_name }
+  "DOB":
+    { from: dob }
+  "HomeAddress":
+    { from: home_full }
+  "Phone":
+    { from: phone }
+  "Cite":
+    { literal: "s. 119.071(4)(d), F.S." }
+  "Chk_4d":
+    { checkbox: true, when: { field: exemption_code, equals: FL_119_071_4d } }
+  "Chk_Agent":
+    { checkbox: true, check: true }

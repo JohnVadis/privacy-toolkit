@@ -1,0 +1,54 @@
+# Opt-out / removal site catalog. Add or remove sites as the client's checklist evolves.
+# `needs` lists the client variables that site's form asks for (used to pre-fill the
+# worklist so the worker copies/pastes instead of retyping).
+#
+# NOTE: These sites use CAPTCHAs, email verification, and their own terms of service.
+# This tool PREPARES the values and tracks status — a human does the actual submit.
+
+- key: fastbackgroundcheck
+  name: FastBackgroundCheck
+  category: data_broker
+  opt_out_url: "https://www.fastbackgroundcheck.com/removal"
+  needs: [full_name, home_city, home_state, email]
+  supports_agent: true
+  notes: "Find the listing, confirm it's the client, then submit. Email verification follows."
+
+- key: whitepages
+  name: Whitepages
+  category: data_broker
+  opt_out_url: "https://www.whitepages.com/suppression-requests"
+  needs: [full_name, home_city, home_state]
+  supports_agent: false
+  notes: "Locate the specific profile URL first; phone verification is common."
+
+- key: spokeo
+  name: Spokeo
+  category: data_broker
+  opt_out_url: "https://www.spokeo.com/optout"
+  needs: [full_name, email]
+  supports_agent: false
+  notes: "Requires the exact Spokeo profile URL + email confirmation."
+
+- key: radaris
+  name: Radaris
+  category: data_broker
+  opt_out_url: "https://radaris.com/control/privacy"
+  needs: [full_name, home_city, home_state, email]
+  supports_agent: false
+  notes: "Account/verification step; re-check after ~2 weeks."
+
+- key: zillow
+  name: Zillow
+  category: property_site
+  opt_out_url: "https://www.zillow.com/z/privacy/"
+  needs: [full_name, home_full]
+  supports_agent: true
+  notes: "Owner privacy / info-removal request for the specific listing. Confirm it's the residence."
+
+- key: google_results_about_you
+  name: Google — Results about you
+  category: search_engine
+  opt_out_url: "https://myactivity.google.com/results-about-you"
+  needs: [full_name, home_full, phone, email]
+  supports_agent: false
+  notes: "Do this AFTER the underlying source is removed/changed. Residual PII only."

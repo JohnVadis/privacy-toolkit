@@ -1,0 +1,30 @@
+# Hillsborough County Property Appraiser — "Request of Confidentiality" (119.071(4)(d)).
+
+# Flat scan -> overlay mode. Category list on this form is informational (bullets),
+
+# so there is no category checkbox: text fields only. Reused for every client.
+
+mode: overlay
+
+form_key: hillsborough_appraiser_confidentiality
+
+title: "Property Appraiser — Request of Confidentiality, s. 119.071(4)(d)"
+
+county: "Hillsborough"
+
+pdf: forms/_blank_pdfs/Hillsborough_Property_Appraisers_Exemption.pdf
+
+entries:
+
+  - { page: 1, x: 252, y: 652, from: full_name }                        # "I ___ (print name)"
+
+  - { anchor: "Property ID Number:", dx: 8, dy: 2, from: home_parcel_id }
+
+  - { anchor: "Name of Owner / Relationship:", dx: 8, dy: 3, from: owner_relationship }
+
+  - { anchor: "Home Address:", dx: 8, dy: 2, from: home_full }
+
+  - { page: 1, x: 196, y: 462, from: phone }                            # PHONE NUMBER: Home ___
+
+  # Office of Employment / Badge / Supervisor / Signature / Date left blank on purpose.
+

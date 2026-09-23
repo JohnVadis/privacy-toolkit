@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>{% block title %}Privacy Removal Toolkit{% endblock %}</title>
+  {# Vendored locally on purpose: this app makes no external requests at runtime. #}
+  <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}">
+  <script src="{{ url_for('static', path='/vendor/htmx.min.js') }}" defer></script>
+  <script src="{{ url_for('static', path='/app.js') }}" defer></script>
+  <link rel="icon" href="data:,">
+</head>
+<body>
+  <header class="masthead">
+    <div class="masthead-inner">
+      <a class="brand" href="{{ url_for('client_list') }}">Privacy Removal Toolkit
+        <small>Hillsborough County, FL</small></a>
+      <nav>
+        <a href="{{ url_for('client_list') }}" {% if nav == 'clients' %}aria-current="page"{% endif %}>Clients</a>
+        <a href="{{ url_for('forms_overview') }}" {% if nav == 'forms' %}aria-current="page"{% endif %}>Forms</a>
+        <a href="{{ url_for('feedback_page') }}" id="comment-link"
+           title="Take a picture of this screen and send a comment">Comment</a>
+      </nav>
+    </div>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <script>
+    /* Capture the screen you are ON, before navigating to the comment page. */
+    (function () {
+      var link = document.getElementById('comment-link');
+      if (!link) { return; }
+      link.addEventListener('click', function (e) {
+        e.preventDefault();
+        link.textContent = 'Capturing…';
+        fetch('/feedback/capture', { method: 'POST' })
+          .catch(function () { /* the page will say no screenshot was taken */ })
+          .finally(function () { window.location = link.href; });
+      });
+    })();
+  </script>
+</body>
+</html>

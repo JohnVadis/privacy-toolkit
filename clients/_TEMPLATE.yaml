@@ -1,0 +1,54 @@
+# Copy this file to clients/<lastname_firstname>.yaml and fill it in ONCE per client.
+# Single source of truth — every form and the worklist read from here.
+# Keep the clients/ folder OUT of version control and encrypted at rest.
+
+case:
+  case_number: ""            # your internal id, e.g. QV-2026-001
+  display_name: ""           # "Lastname, Firstname" — used for output folder + titles
+  acting_as_agent: true
+  agent_name: ""             # who signs/submits (you), if acting as agent
+  agent_email: ""
+  exemption:                 # verify eligibility before generating anything
+    code: ""                 # e.g. FL_119_071_4d
+    title: ""                # e.g. Protected professions personnel
+    cite: ""                 # e.g. s. 119.071(4)(d), F.S.
+    category: ""             # military | law_enforcement | judges  (selects the form checkbox)
+    job_title: ""            # required on the Clerk redaction form for employment-based exemptions
+    employing_agency: ""     # required on the Clerk redaction form for employment-based exemptions
+
+persons:
+  - role: primary            # primary | spouse | child | dependent
+    first_name: ""
+    middle_name: ""
+    last_name: ""
+    suffix: ""
+    dob: ""                  # YYYY-MM-DD
+    phones: [""]
+    emails: [""]
+    addresses:
+      - line1: ""
+        line2: ""
+        city: ""
+        county: ""           # required — FL Clerk/Appraiser are county-level
+        state: ""
+        zip: ""
+        parcel_id: ""        # Property ID / parcel number (for the Appraiser forms)
+        current: true
+        residence: true
+  # - role: spouse           # add linked persons if the engagement covers them
+  #   first_name: ""
+  #   ...
+
+# The recorded documents the Clerk redaction form names. Import them from the county's
+# Official Records search rather than typing them:
+#   python import_documents.py --client clients/<name>.yaml <export>.csv
+# or the Documents screen in the app. Leave it out and the form's table prints blank,
+# to be written in at the Clerk's counter.
+# documents:
+#   - instrument_number: "2019123456"
+#     book: "26841"
+#     page: "1234"
+#     title: "WARRANTY DEED"
+#     recorded: "2019-05-14"   # optional — not printed, kept for your reference
+#     list: redact             # redact (default) | release (prior redactions released)
+#     persons: [primary]       # optional — omit to list it on everyone's form

@@ -1,0 +1,7 @@
+# Normalize line endings so a diff is about content, not about CRLF.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.ico binary
+*.pdf binary
+*.xlsx binary
+*.png binary

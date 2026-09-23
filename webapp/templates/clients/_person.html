@@ -1,0 +1,101 @@
+{# One person. `pi` = person index. Rendered inline on load and by the HTMX fragment. #}
+{% set base = "persons[" ~ pi ~ "]" %}
+{% set path = "persons." ~ pi %}
+{% set addresses = p.get('addresses') or [] %}
+<fieldset data-idx-group="persons" data-idx="{{ pi }}" data-person-block>
+  <legend>Person {{ pi + 1 }}</legend>
+
+  <div class="row-head">
+    <h3>{{ (p.get('first_name') ~ ' ' ~ p.get('last_name')) | trim or 'New person' }}</h3>
+    <button type="button" class="btn-quiet btn-small" onclick="removeRow(this, 'fieldset')"
+            aria-label="Remove this person">Remove person</button>
+  </div>
+
+  <div class="grid">
+    <div class="field">
+      {% set role_errs = field_errors.get(path ~ ".role", []) %}
+      <label for="{{ base }}[role]">Role</label>
+      <select id="{{ base }}[role]" name="{{ base }}[role]"
+              {% if role_errs %}aria-invalid="true"{% endif %}>
+        <option value="">— select —</option>
+        {% for r in roles %}
+          <option value="{{ r }}" {% if p.get('role') == r %}selected{% endif %}>{{ r.replace('_', ' ') }}</option>
+        {% endfor %}
+      </select>
+      {% for msg in role_errs %}<p class="field-error">{{ msg }}</p>{% endfor %}
+    </div>
+    <div class="field">
+      {% set name_errs = field_errors.get(path ~ ".first_name", []) %}
+      <label for="{{ base }}[first_name]">First name</label>
+      <input type="text" id="{{ base }}[first_name]" name="{{ base }}[first_name]"
+             value="{{ p.get('first_name', '') }}" autocomplete="off"
+             {% if name_errs %}aria-invalid="true"{% endif %}>
+      {% for msg in name_errs %}<p class="field-error">{{ msg }}</p>{% endfor %}
+    </div>
+    <div class="field">
+      <label for="{{ base }}[middle_name]">Middle name</label>
+      <input type="text" id="{{ base }}[middle_name]" name="{{ base }}[middle_name]"
+             value="{{ p.get('middle_name', '') }}" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="{{ base }}[last_name]">Last name</label>
+      <input type="text" id="{{ base }}[last_name]" name="{{ base }}[last_name]"
+             value="{{ p.get('last_name', '') }}" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="{{ base }}[suffix]">Suffix</label>
+      <input type="text" id="{{ base }}[suffix]" name="{{ base }}[suffix]"
+             value="{{ p.get('suffix', '') }}" autocomplete="off" maxlength="12">
+    </div>
+    <div class="field">
+      {% set dob_errs = field_errors.get(path ~ ".dob", []) %}
+      <label for="{{ base }}[dob]">Date of birth</label>
+      <input type="date" id="{{ base }}[dob]" name="{{ base }}[dob]" value="{{ p.get('dob', '') }}"
+             {% if dob_errs %}aria-invalid="true"{% endif %}>
+      {% for msg in dob_errs %}<p class="field-error">{{ msg }}</p>{% endfor %}
+      {% if not dob_errs %}<p class="hint">Stored as YYYY-MM-DD; forms render MM/DD/YYYY.</p>{% endif %}
+    </div>
+  </div>
+
+  <h2>Contact</h2>
+  <div class="grid two">
+    <div class="field">
+      <label>Phone numbers</label>
+      <div id="phones-{{ pi }}">
+        {% for phone in (p.get('phones') or ['']) %}
+          {% set kind = 'phones' %}{% set value = phone %}
+          {% include "clients/_contact.html" %}
+        {% endfor %}
+      </div>
+      <button type="button" class="btn-small"
+              hx-get="{{ url_for('fragment_contact') }}?pi={{ pi }}&kind=phones"
+              hx-target="#phones-{{ pi }}" hx-swap="beforeend">+ Add phone</button>
+    </div>
+    <div class="field">
+      <label>Email addresses</label>
+      <div id="emails-{{ pi }}">
+        {% for mail in (p.get('emails') or ['']) %}
+          {% set kind = 'emails' %}{% set value = mail %}
+          {% include "clients/_contact.html" %}
+        {% endfor %}
+      </div>
+      <button type="button" class="btn-small"
+              hx-get="{{ url_for('fragment_contact') }}?pi={{ pi }}&kind=emails"
+              hx-target="#emails-{{ pi }}" hx-swap="beforeend">+ Add email</button>
+    </div>
+  </div>
+
+  <h2>Addresses</h2>
+  {% set addr_errs = field_errors.get(path ~ ".addresses", []) %}
+  {% for msg in addr_errs %}<p class="field-error">{{ msg }}</p>{% endfor %}
+  <div id="addresses-{{ pi }}" data-residence-group>
+    {% for addr in addresses %}
+      {% set a = addr %}{% set ai = loop.index0 %}{% set is_residence = addr.get('residence') %}
+      {% include "clients/_address.html" %}
+    {% endfor %}
+  </div>
+  <button type="button" class="btn-small"
+          hx-get="{{ url_for('fragment_address') }}"
+          hx-vals='js:{pi: {{ pi }}, index: nextIndex("persons[{{ pi }}][addresses]")}'
+          hx-target="#addresses-{{ pi }}" hx-swap="beforeend">+ Add address</button>
+</fieldset>

@@ -1,0 +1,65 @@
+{# One address. `pi` = person index, `ai` = address index. Rendered inline and by HTMX. #}
+{% set base = "persons[" ~ pi ~ "][addresses][" ~ ai ~ "]" %}
+{% set path = "persons." ~ pi ~ ".addresses." ~ ai %}
+<div class="subcard" data-idx-group="persons[{{ pi }}][addresses]" data-idx="{{ ai }}">
+  <div class="row-head">
+    <h3>Address</h3>
+    <label class="check">
+      <input type="radio" name="persons[{{ pi }}][residence_index]" value="{{ ai }}"
+             {% if is_residence %}checked{% endif %}>
+      Residence
+    </label>
+    <label class="check">
+      <input type="hidden" name="{{ base }}[current]" value="0">
+      <input type="checkbox" name="{{ base }}[current]" value="1"
+             {% if a.get('current') %}checked{% endif %}>
+      Current
+    </label>
+    <button type="button" class="btn-quiet btn-small" onclick="removeRow(this, '.subcard')"
+            aria-label="Remove this address">Remove</button>
+  </div>
+
+  <div class="grid">
+    <div class="field wide">
+      <label for="{{ base }}[line1]">Street address</label>
+      <input type="text" id="{{ base }}[line1]" name="{{ base }}[line1]" value="{{ a.get('line1', '') }}"
+             autocomplete="off">
+    </div>
+    <div class="field wide">
+      <label for="{{ base }}[line2]">Address line 2 <span class="muted">(optional)</span></label>
+      <input type="text" id="{{ base }}[line2]" name="{{ base }}[line2]" value="{{ a.get('line2', '') }}"
+             autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="{{ base }}[city]">City</label>
+      <input type="text" id="{{ base }}[city]" name="{{ base }}[city]" value="{{ a.get('city', '') }}"
+             autocomplete="off">
+    </div>
+    <div class="field">
+      {% set county_errs = field_errors.get(path ~ ".county", []) %}
+      <label for="{{ base }}[county]">County</label>
+      <input type="text" id="{{ base }}[county]" name="{{ base }}[county]" value="{{ a.get('county', '') }}"
+             autocomplete="off" {% if county_errs %}aria-invalid="true"{% endif %}>
+      {% for msg in county_errs %}<p class="field-error">{{ msg }}</p>{% endfor %}
+      {% if is_residence and not county_errs %}
+        <p class="hint">Clerk and Property Appraiser forms are county-level.</p>
+      {% endif %}
+    </div>
+    <div class="field">
+      <label for="{{ base }}[state]">State</label>
+      <input type="text" id="{{ base }}[state]" name="{{ base }}[state]" value="{{ a.get('state', '') }}"
+             autocomplete="off" maxlength="20">
+    </div>
+    <div class="field">
+      <label for="{{ base }}[zip]">ZIP</label>
+      <input type="text" id="{{ base }}[zip]" name="{{ base }}[zip]" value="{{ a.get('zip', '') }}"
+             autocomplete="off" inputmode="numeric" maxlength="10">
+    </div>
+    <div class="field wide">
+      <label for="{{ base }}[parcel_id]">Parcel / Property ID <span class="muted">(optional)</span></label>
+      <input type="text" id="{{ base }}[parcel_id]" name="{{ base }}[parcel_id]"
+             value="{{ a.get('parcel_id', '') }}" autocomplete="off" class="mono">
+      <p class="hint">Used by both Property Appraiser forms.</p>
+    </div>
+  </div>
+</div>

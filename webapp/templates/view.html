@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}{{ current.title if current and current.title else filename }}{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>{{ current.title if current and current.title else filename }}</h1>
+    <p class="lede">
+      {{ display_name }}{% if current and current.person %} —
+      {{ current.person.replace('_', ' ') }}{% endif %}
+      <span class="muted mono">· {{ filename }}</span>
+    </p>
+  </div>
+  <a class="btn" href="{{ url_for('client_files', slug=slug) }}">← All filled forms</a>
+  <a class="btn btn-primary"
+     href="{{ url_for('edit_text', slug=slug, filename=filename) }}">Edit text</a>
+  <a class="btn" href="{{ url_for('download_file', slug=slug, filename=filename) }}"
+     download>Save a copy</a>
+  <form method="post" style="display:inline"
+        action="{{ url_for('reveal_file', slug=slug, filename=filename) }}">
+    <button type="submit" class="btn">Show in folder</button>
+  </form>
+</div>
+
+{# The webview and every browser have a built-in PDF reader: paging, zoom and print
+   come free. The fallback below shows if the reader is unavailable. #}
+<div class="pdf-frame">
+  <object data="{{ url_for('inline_file', slug=slug, filename=filename) }}"
+          type="application/pdf" width="100%" height="100%">
+    <div class="empty">
+      <p>This window can't display the PDF directly.</p>
+      <p>
+        <a class="btn btn-primary"
+           href="{{ url_for('download_file', slug=slug, filename=filename) }}"
+           download>Save a copy</a>
+      </p>
+    </div>
+  </object>
+</div>
+
+{% if files | length > 1 %}
+  <h2>Other forms for {{ display_name }}</h2>
+  <div class="table-wrap">
+    <table>
+      <tbody>
+        {% for f in files %}
+          {% if f.filename != filename %}
+          <tr>
+            <td>
+              <strong>{{ f.title or f.form_key.replace('_', ' ') }}</strong>
+              {% if f.person %}<span class="muted">— {{ f.person.replace('_', ' ') }}</span>{% endif %}
+            </td>
+            <td class="actions">
+              <a class="btn btn-small"
+                 href="{{ url_for('view_file', slug=slug, filename=f.filename) }}">View</a>
+            </td>
+          </tr>
+          {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+
+{% endblock %}

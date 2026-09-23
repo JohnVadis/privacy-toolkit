@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}{{ status }} — Privacy Removal Toolkit{% endblock %}
+{% block content %}
+<h1>{{ status }}</h1>
+<p class="lede">{{ detail }}</p>
+<p><a class="btn" href="{{ url_for('client_list') }}">Back to clients</a></p>
+{% endblock %}

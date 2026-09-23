@@ -1,0 +1,14 @@
+# Engine (CLI) — deterministic fill path, no network, no model calls.
+pypdf>=4.0
+PyYAML>=6.0
+openpyxl>=3.1
+pdfplumber>=0.11        # overlay anchors (pdf_overlay.py)
+reportlab>=4.0          # overlay stamping (pdf_overlay.py)
+
+# Local web UI (webapp/) — binds to 127.0.0.1, no outbound calls.
+fastapi>=0.110
+uvicorn>=0.27
+jinja2>=3.1
+python-multipart>=0.0.9  # form POST parsing
+pypdfium2>=4.25          # page-1 PNG previews (already a pdfplumber dep)
+pywebview>=5.0           # desktop window (uses the WebView2 runtime already on Win10/11)

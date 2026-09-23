@@ -1,0 +1,36 @@
+mode: overlay
+form_key: test
+title: Test full title
+county: Hillsborough
+pdf: forms/_blank_pdfs/test.pdf
+entries:
+- anchor: 'Printed Name:'
+  page: 2
+  dx: 6
+  dy: 0
+  from: full_name
+- anchor: 'Telephone Number:'
+  page: 2
+  dx: 6
+  dy: 0
+  from: phone
+- anchor: 'Email address:'
+  page: 2
+  dx: 6
+  dy: 0
+  from: email
+- anchor: 'mailing, or street address):'
+  page: 2
+  dx: 6
+  dy: 0
+  from: home_full
+- anchor: '/ Date of Birth:'
+  page: 2
+  dx: 6
+  dy: 0
+  from: dob
+- anchor: 'agency employment is required):'
+  page: 4
+  dx: 6
+  dy: 0
+  from: employing_agency

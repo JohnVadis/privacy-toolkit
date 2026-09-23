@@ -1,0 +1,68 @@
+# Hillsborough Clerk of Court — "Request for Redaction of Exempt Personal Information
+# from Non-Judicial Public Records" (4 pp, flat scan -> overlay).
+# Requestor type set by person role; statutory category set by exemption.category
+# (military | law_enforcement | judges). The two document tables print the client's
+# `documents:` rows — import them with import_documents.py or the Documents screen.
+# With nothing imported the tables stay blank, to be written at the courthouse.
+mode: overlay
+form_key: hillsborough_clerk_redaction
+title: "Clerk of Court — Redaction of Exempt Personal Information from Non-Judicial Public Records"
+county: "Hillsborough"
+pdf: forms/_blank_pdfs/Hillsborough_Redaction.pdf
+entries:
+  # --- page 1: requestor type (by role) ---
+  - { page: 1, x: 73, y: 683, mark: "X", when: { field: role, equals: primary } }
+  - { page: 1, x: 73, y: 670, mark: "X", when: { field: role, equals: spouse } }
+  - { page: 1, x: 73, y: 656, mark: "X", when: { field: role, equals: child } }
+  # --- page 1: statutory category (by exemption.category) ---
+  - { page: 1, x: 55,  y: 564, mark: "X", when: { field: exemption_category, equals: law_enforcement } }
+  - { page: 1, x: 55,  y: 349, mark: "X", when: { field: exemption_category, equals: judges } }
+  - { page: 1, x: 312, y: 215, mark: "X", when: { field: exemption_category, equals: military } }
+  # --- page 2: contact info ---
+  - { page: 2, x: 142, y: 685, from: full_name }                 # Printed Name:
+  - { page: 2, x: 166, y: 652, from: phone }                     # Telephone Number:
+  - { page: 2, x: 321, y: 652, from: email }                     # Email address:
+  # --- page 2: information to be redacted (address, phone, DOB) ---
+  - { page: 2, x: 73,  y: 601, mark: "X", check: true }          # Address where I reside
+  - { page: 2, x: 73,  y: 487, mark: "X", check: true }          # Telephone Number(s)
+  - { page: 2, x: 289, y: 471, mark: "X", check: true }          # Date of Birth box
+  - { page: 2, x: 365, y: 469, from: dob }                       # Date of Birth value
+  # --- page 4: notary county + qualifying employment ---
+  - { anchor: "COUNTY OF", page: 4, dx: 6, dy: 0, from: home_county }
+  - { page: 4, x: 190, y: 635, from: job_title }                 # Job Title of Qualifying Individual
+  - { page: 4, x: 224, y: 602, from: employing_agency }          # Employing Agency
+  # Signature/Date left for the notarized signing.
+
+# Repeating rows from the client's `documents:` list. Coordinates are the ruled lines
+# on the blank form: the baseline sits 2.5pt above each rule, columns start 2pt inside
+# each rule's left edge. When there are more documents than ruled lines, the last line
+# reads "Continued on Attachment A/B" and every document is listed on that attachment.
+tables:
+  - key: documents_to_redact
+    list: redact
+    heading: "Documents to be Redacted"
+    attachment: "A"
+    page: 2
+    rows: 4                     # ruled lines at y = 142.4, 125.0, 107.5, 90.1
+    first_y: 144.9
+    row_pitch: 17.4
+    size: 9
+    columns:
+      - { from: instrument_number, x: 74,  width: 138 }
+      - { from: book,              x: 227, width: 57 }
+      - { from: page,              x: 299, width: 57 }
+      - { from: title,             x: 371, width: 167 }
+  - key: prior_redactions_released
+    list: release
+    heading: "Prior Redactions to be Released"
+    attachment: "B"
+    page: 3
+    rows: 2                     # ruled lines at y = 413.3, 395.9
+    first_y: 415.8
+    row_pitch: 17.4
+    size: 9
+    columns:
+      - { from: instrument_number, x: 74,  width: 138 }
+      - { from: book,              x: 227, width: 57 }
+      - { from: page,              x: 299, width: 57 }
+      - { from: title,             x: 371, width: 167 }

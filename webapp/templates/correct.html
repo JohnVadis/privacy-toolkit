@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Fix {{ form_key }} — {{ display_name }}{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>Add text to this form</h1>
+    <p class="lede">{{ display_name }}{% if person %} — {{ person.replace('_', ' ') }}{% endif %}
+      <span class="muted mono">· {{ filename }}</span></p>
+  </div>
+  <a class="btn" href="{{ url_for('edit_text', slug=slug, filename=filename) }}">← Edit existing text</a>
+  <a class="btn" href="{{ url_for('view_file', slug=slug, filename=filename) }}">Back to the form</a>
+</div>
+
+<p class="gate"><strong>For a blank the form doesn't fill by itself.</strong>
+  To change a value that is <em>already</em> printed, use
+  <a href="{{ url_for('edit_text', slug=slug, filename=filename) }}">Edit text</a> instead.
+  Click the spot, then type what belongs there.
+  Your fixes are saved against this client, so they are re-applied every time this form
+  is generated — they won't be lost the next time you press Generate. To change something
+  for <em>every</em> client, edit the form's mapping instead.</p>
+
+<div class="correct-layout">
+  <div>
+    {% if page_count > 1 %}
+      <div class="pager">
+        <span class="muted">Page</span>
+        {% for n in range(1, page_count + 1) %}
+          <a class="btn btn-small {% if n == page %}btn-primary{% endif %}"
+             href="{{ url_for('correct_form', slug=slug, filename=filename) }}?page={{ n }}">{{ n }}</a>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {# The click target. data-* carry what JS needs to convert pixels to PDF points. #}
+    <div class="page-canvas" id="canvas">
+      <img id="page-img" alt="Page {{ page }} of {{ filename }}"
+           src="{{ url_for('generated_page_png', slug=slug, filename=filename, page=page) }}">
+      <div id="pin" class="pin" hidden></div>
+    </div>
+    <p class="hint">Showing page {{ page }}{% if page_count > 1 %} of {{ page_count }}{% endif %}.
+      Zoom your window if you need a closer look.</p>
+  </div>
+
+  <div>
+    <form method="post" id="add-form"
+          action="{{ url_for('correct_add', slug=slug, filename=filename) }}">
+      <fieldset>
+        <legend>Add text</legend>
+        <input type="hidden" name="page" value="{{ page }}">
+        <input type="hidden" name="x" id="x" value="">
+        <input type="hidden" name="y" id="y" value="">
+
+        <div class="field">
+          <label for="spot">Where</label>
+          <input type="text" id="spot" value="" readonly
+                 placeholder="click the form on the left">
+        </div>
+        <div class="field">
+          <label for="text">Text to add</label>
+          <input type="text" id="text" name="text" maxlength="200" autocomplete="off"
+                 placeholder="e.g. Sergeant">
+        </div>
+        <div class="field">
+          <label for="size">Size</label>
+          <select id="size" name="size">
+            <option value="8">Small (8pt)</option>
+            <option value="10" selected>Normal (10pt)</option>
+            <option value="12">Large (12pt)</option>
+          </select>
+        </div>
+        <div class="actions-bar">
+          <button type="submit" class="primary" id="add-btn" disabled>Add to the form</button>
+        </div>
+        <p class="hint">Use <span class="mono">X</span> as the text to tick a checkbox.</p>
+      </fieldset>
+    </form>
+
+    <h2>Fixes on this form</h2>
+    {% if not corrections %}
+      <p class="muted">None yet.</p>
+    {% else %}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th scope="col">Text</th><th scope="col">Page</th><th scope="col"></th></tr>
+          </thead>
+          <tbody>
+            {% for c in corrections %}
+            <tr>
+              <td><strong>{{ c.text }}</strong><br>
+                <span class="muted mono">x {{ c.x }}, y {{ c.y }}</span></td>
+              <td class="num">{{ c.page }}</td>
+              <td class="actions">
+                <form method="post"
+                      action="{{ url_for('correct_remove', slug=slug, filename=filename) }}">
+                  <input type="hidden" name="index" value="{{ c.index }}">
+                  <button type="submit" class="btn-small btn-danger-quiet">Remove</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+  /* Turn a click on the page image into a PDF coordinate (origin bottom-left). */
+  (function () {
+    var img = document.getElementById('page-img');
+    var canvas = document.getElementById('canvas');
+    var pin = document.getElementById('pin');
+    if (!img) { return; }
+
+    canvas.addEventListener('click', function (event) {
+      var rect = img.getBoundingClientRect();
+      var relX = event.clientX - rect.left;
+      var relY = event.clientY - rect.top;
+      if (relX < 0 || relY < 0 || relX > rect.width || relY > rect.height) { return; }
+
+      /* The image is drawn at whatever CSS size fits, so scale off the rendered
+         box rather than the natural pixel size. */
+      var wPt = parseFloat(img.dataset.widthPt || '612');
+      var hPt = parseFloat(img.dataset.heightPt || '792');
+      var xPt = (relX / rect.width) * wPt;
+      var yPt = hPt - (relY / rect.height) * hPt;   /* PDF origin is bottom-left */
+
+      document.getElementById('x').value = xPt.toFixed(1);
+      document.getElementById('y').value = yPt.toFixed(1);
+      document.getElementById('spot').value = 'x ' + xPt.toFixed(0) + ', y ' + yPt.toFixed(0);
+      document.getElementById('add-btn').disabled = false;
+
+      pin.hidden = false;
+      pin.style.left = relX + 'px';
+      pin.style.top = relY + 'px';
+      document.getElementById('text').focus();
+    });
+
+    /* The page's size in points comes back as headers on the PNG; read them once. */
+    fetch(img.src, { method: 'HEAD' }).then(function (r) {
+      img.dataset.widthPt = r.headers.get('X-Page-Width-Pt') || '612';
+      img.dataset.heightPt = r.headers.get('X-Page-Height-Pt') || '792';
+    }).catch(function () { /* defaults above are US Letter */ });
+  })();
+</script>
+
+{% endblock %}

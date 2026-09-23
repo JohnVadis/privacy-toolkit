@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Filled forms — {{ display_name }}{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>Filled forms</h1>
+    <p class="lede">{{ display_name }} — everything generated so far, newest first.</p>
+  </div>
+  <a class="btn" href="{{ url_for('client_edit', slug=slug) }}">Edit client</a>
+  <a class="btn btn-primary" href="{{ url_for('generate_page', slug=slug) }}">Generate more</a>
+</div>
+
+{% if not files %}
+  <div class="card empty">
+    <p>Nothing has been generated for this client yet.</p>
+    <p><a class="btn btn-primary" href="{{ url_for('generate_page', slug=slug) }}">Generate forms</a></p>
+  </div>
+{% else %}
+  <p class="gate"><strong>These are drafts for review.</strong> Check each one, notarize
+    where the county requires it, then submit it yourself. Nothing here has been sent.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Form</th>
+          <th scope="col">For</th>
+          <th scope="col">Created</th>
+          <th scope="col">Size</th>
+          <th scope="col"><span class="muted">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in files %}
+        <tr>
+          <td>
+            <strong>{{ f.title or f.form_key.replace('_', ' ') }}</strong><br>
+            <span class="muted mono">{{ f.filename }}</span>
+          </td>
+          <td>
+            {% if f.person %}{{ f.person.replace('_', ' ') }}
+            {% else %}<span class="muted">—</span>{% endif %}
+          </td>
+          <td>{{ f.modified.strftime('%d %b %Y, %H:%M') }}</td>
+          <td class="num">{{ f.size_h }}</td>
+          <td class="actions">
+            {% if f.is_pdf %}
+              <a class="btn btn-small btn-primary"
+                 href="{{ url_for('view_file', slug=slug, filename=f.filename) }}">View</a>
+              <a class="btn btn-small"
+                 href="{{ url_for('edit_text', slug=slug, filename=f.filename) }}">Edit text</a>
+            {% endif %}
+            <a class="btn btn-small"
+               href="{{ url_for('download_file', slug=slug, filename=f.filename) }}"
+               download>Save a copy</a>
+            <form method="post" style="display:inline"
+                  action="{{ url_for('reveal_file', slug=slug, filename=f.filename) }}">
+              <button type="submit" class="btn-small btn-quiet">Show in folder</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <p class="muted" style="margin-top:1rem">
+    These files live in <span class="mono">{{ output_rel }}/</span> on this computer.
+    Generating the same form again replaces the file.
+  </p>
+{% endif %}
+
+{% endblock %}

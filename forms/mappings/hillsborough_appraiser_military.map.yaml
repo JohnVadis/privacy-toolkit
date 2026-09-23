@@ -1,0 +1,18 @@
+# Hillsborough County Property Appraiser — "Request for Confidentiality – Service Member"
+# (FS 119.071(5)). Image-only scan -> overlay mode with absolute coordinates.
+# Status box is marked by the person's role (primary=member, spouse=spouse, child=dependent).
+# Evidence boxes (Military ID / Orders / DD-214) left blank — worker checks what they attach.
+mode: overlay
+form_key: hillsborough_appraiser_military
+title: "Property Appraiser — Request for Confidentiality, Service Member, s. 119.071(5)"
+county: "Hillsborough"
+pdf: forms/_blank_pdfs/Hillsborough_Military_Confidentiality_Form_Refined2.pdf
+entries:
+  - { page: 1, x: 259, y: 500, from: full_name }               # "I ___ (print name)"
+  - { page: 1, x: 172, y: 425, from: home_parcel_id }          # Property ID Number
+  - { page: 1, x: 222, y: 401, from: owner_relationship }      # Name of Owner / Relationship
+  - { page: 1, x: 140, y: 372, from: home_full }               # Home Address
+  - { page: 1, x: 62,  y: 326, mark: "X", when: { field: role, equals: primary } }    # member
+  - { page: 1, x: 62,  y: 267, mark: "X", when: { field: role, equals: spouse } }     # spouse
+  - { page: 1, x: 62,  y: 206, mark: "X", when: { field: role, equals: child } }      # dependent
+  - { page: 1, x: 62,  y: 206, mark: "X", when: { field: role, equals: dependent } }  # dependent

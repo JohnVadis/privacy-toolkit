@@ -1,0 +1,26 @@
+# FL Department of State — "Public Records Exemption Request" (Rev 07/2025, 4 pp).
+# Filename was "address-confidentiality..." but this is the DoS exemption form (it
+# includes the Division of Corporations addendum on p3 — left blank unless the client
+# has Sunbiz records). Attestation marks "current" by role; verify current-vs-former.
+# Category by exemption.category (military | law_enforcement | judges).
+mode: overlay
+form_key: fl_dos_public_records_exemption
+title: "FL Dept. of State — Public Records Exemption Request (Rev 07/2025)"
+county: "Statewide"
+pdf: forms/_blank_pdfs/address-confidentiality-exemption-form-07-2025.pdf
+entries:
+  # --- page 1: attestation (by role; defaults to "current") ---
+  - { page: 1, x: 190, y: 475, mark: "X", when: { field: role, equals: primary } }
+  - { page: 1, x: 191, y: 454, mark: "X", when: { field: role, equals: spouse } }
+  - { page: 1, x: 191, y: 431, mark: "X", when: { field: role, equals: child } }
+  # --- category: judges is on p1; law enforcement + military on p2 ---
+  - { page: 1, x: 328, y: 106, mark: "X", when: { field: exemption_category, equals: judges } }
+  - { page: 2, x: 48,  y: 678, mark: "X", when: { field: exemption_category, equals: law_enforcement } }
+  - { page: 2, x: 325, y: 636, mark: "X", when: { field: exemption_category, equals: military } }
+  # --- page 2: identity fields ---
+  - { page: 2, x: 96,  y: 469, from: full_name }     # Printed Name:
+  - { page: 2, x: 327, y: 469, from: dob }           # Date of Birth:
+  - { page: 2, x: 460, y: 469, from: phone }         # Phone Number:
+  - { page: 2, x: 101, y: 429, from: home_full }     # Home Address:
+  - { anchor: "COUNTY OF", page: 2, dx: 6, dy: 0, from: home_county }
+  # Signature/Date and the Division of Corporations addendum (p3) left blank.

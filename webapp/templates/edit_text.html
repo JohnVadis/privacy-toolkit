@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}Edit form — {{ title }}{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>Edit this form</h1>
+    <p class="lede">{{ display_name }}{% if person %} — {{ person.replace('_', ' ') }}{% endif %}
+      <span class="muted mono">· {{ title }}</span></p>
+  </div>
+  <a class="btn" href="{{ url_for('view_file', slug=slug, filename=filename) }}">← Back to the form</a>
+</div>
+
+{% if saved %}
+  <p class="note note-ok"><strong>Saved and re-generated.</strong>
+    Your changes are kept against this client and re-applied every time this form is
+    generated.</p>
+{% endif %}
+
+<p class="gate"><strong>Type straight onto the form; click a box to tick or untick it.</strong>
+  Empty spot? Click it to add text or a tick there. To fix the underlying detail for
+  every form, <a href="{{ url_for('client_edit', slug=slug) }}">edit the client</a> instead.</p>
+
+<form method="post" action="{{ url_for('edit_text_save', slug=slug, filename=filename) }}"
+      id="form-editor">
+  <input type="hidden" name="page" value="{{ page }}">
+
+  <div class="pager">
+    <span class="muted">Page</span>
+    {% for n in range(1, page_count + 1) %}
+      <a class="btn btn-small {% if n == page %}btn-primary{% endif %}"
+         href="{{ url_for('edit_text', slug=slug, filename=filename) }}?page={{ n }}">{{ n }}</a>
+    {% endfor %}
+    <span class="spacer"></span>
+    <span class="muted" id="mode-hint">Click an empty spot to add something</span>
+  </div>
+
+  {# The blank page, with a control over every spot the engine writes to. Using the
+     blank rather than the filled page keeps the original text from showing through
+     underneath each input. #}
+  <div class="form-canvas" id="canvas" data-w="{{ w_pt }}" data-h="{{ h_pt }}">
+    <img id="page-img" alt="Page {{ page }} of {{ title }}"
+         src="{{ url_for('blank_page_png', form_key=form_key, page=page) }}">
+
+    {% for it in on_page %}
+      {% set pct_left = (it.x / w_pt * 100) %}
+      {% set pct_top = ((h_pt - it.y) / h_pt * 100) %}
+      {% if it.kind == 'mark' %}
+        <label class="ov-mark" style="left:{{ pct_left }}%; top:{{ pct_top }}%"
+               title="{{ it.label }}">
+          <input type="hidden" name="rows[{{ it.entry }}][entry]" value="{{ it.entry }}">
+          <input type="hidden" name="rows[{{ it.entry }}][kind]" value="mark">
+          <input type="hidden" name="rows[{{ it.entry }}][by_rule]" value="{{ 1 if it.by_rule else 0 }}">
+          <input type="hidden" name="rows[{{ it.entry }}][on]" value="0">
+          <input type="checkbox" name="rows[{{ it.entry }}][on]" value="1"
+                 {% if it.on %}checked{% endif %} aria-label="{{ it.label }}">
+          <span aria-hidden="true"></span>
+        </label>
+      {% else %}
+        <span class="ov-text" style="left:{{ pct_left }}%; top:{{ pct_top }}%">
+          <input type="hidden" name="rows[{{ it.entry }}][entry]" value="{{ it.entry }}">
+          <input type="hidden" name="rows[{{ it.entry }}][kind]" value="text">
+          <input type="hidden" name="rows[{{ it.entry }}][from]" value="{{ it['from'] }}">
+          <input type="hidden" name="rows[{{ it.entry }}][original]" value="{{ it.original }}">
+          <input type="text" name="rows[{{ it.entry }}][value]" value="{{ it.value }}"
+                 maxlength="200" autocomplete="off" spellcheck="false"
+                 size="{{ [ (it.value | length) + 4, 10 ] | max }}"
+                 aria-label="{{ it.label }}" title="{{ it.label }}"
+                 {% if it.edited %}data-edited="1"{% endif %}>
+        </span>
+      {% endif %}
+    {% endfor %}
+
+    {% for a in added %}
+      {% if a.page == page %}
+        <span class="ov-added" style="left:{{ a.x / w_pt * 100 }}%; top:{{ (h_pt - a.y) / h_pt * 100 }}%">
+          <input type="hidden" name="added[{{ a.index }}][page]" value="{{ a.page }}">
+          <input type="hidden" name="added[{{ a.index }}][x]" value="{{ a.x }}">
+          <input type="hidden" name="added[{{ a.index }}][y]" value="{{ a.y }}">
+          <input type="hidden" name="added[{{ a.index }}][kind]" value="text">
+          <input type="text" name="added[{{ a.index }}][text]" value="{{ a.text }}"
+                 maxlength="200" autocomplete="off" size="{{ [ (a.text | length) + 4, 10 ] | max }}"
+                 aria-label="Added text">
+          <button type="button" class="ov-x" title="Remove this"
+                  onclick="dropAdded(this)" aria-label="Remove">x</button>
+        </span>
+      {% else %}
+        <input type="hidden" name="added[{{ a.index }}][page]" value="{{ a.page }}">
+        <input type="hidden" name="added[{{ a.index }}][x]" value="{{ a.x }}">
+        <input type="hidden" name="added[{{ a.index }}][y]" value="{{ a.y }}">
+        <input type="hidden" name="added[{{ a.index }}][kind]" value="text">
+        <input type="hidden" name="added[{{ a.index }}][text]" value="{{ a.text }}">
+      {% endif %}
+    {% endfor %}
+
+    <div id="new-holder"></div>
+  </div>
+
+  {# Entries on the other pages travel along hidden, so one Save commits the lot. #}
+  {% for it in off_page %}
+    <input type="hidden" name="rows[{{ it.entry }}][entry]" value="{{ it.entry }}">
+    <input type="hidden" name="rows[{{ it.entry }}][kind]" value="{{ it.kind }}">
+    {% if it.kind == 'mark' %}
+      <input type="hidden" name="rows[{{ it.entry }}][by_rule]" value="{{ 1 if it.by_rule else 0 }}">
+      <input type="hidden" name="rows[{{ it.entry }}][on]" value="{{ 1 if it.on else 0 }}">
+    {% else %}
+      <input type="hidden" name="rows[{{ it.entry }}][from]" value="{{ it['from'] }}">
+      <input type="hidden" name="rows[{{ it.entry }}][original]" value="{{ it.original }}">
+      <input type="hidden" name="rows[{{ it.entry }}][value]" value="{{ it.value }}">
+    {% endif %}
+  {% endfor %}
+
+  <div class="actions-bar">
+    <button type="submit" class="primary">Save and re-generate</button>
+    <a class="btn btn-quiet" href="{{ url_for('view_file', slug=slug, filename=filename) }}">Cancel</a>
+    <span class="spacer"></span>
+    <span class="muted">Clear a box back to its original text to undo that change.</span>
+  </div>
+</form>
+
+<script>
+  (function () {
+    var canvas = document.getElementById('canvas');
+    var img = document.getElementById('page-img');
+    var holder = document.getElementById('new-holder');
+    var W = parseFloat(canvas.dataset.w), H = parseFloat(canvas.dataset.h);
+    var PAGE = {{ page }};
+    var next = {{ (added | length) + 1000 }};   /* far above existing indexes */
+
+    /* Click a blank part of the page to put something new there. */
+    canvas.addEventListener('click', function (event) {
+      if (event.target !== img) { return; }     /* a control was clicked, not the page */
+      var rect = img.getBoundingClientRect();
+      var xPt = ((event.clientX - rect.left) / rect.width) * W;
+      var yPt = H - ((event.clientY - rect.top) / rect.height) * H;
+      addControl(xPt, yPt, event.clientX - rect.left, event.clientY - rect.top);
+    });
+
+    function addControl(xPt, yPt, leftPx, topPx) {
+      var i = next++;
+      var wrap = document.createElement('span');
+      wrap.className = 'ov-added';
+      wrap.style.left = (leftPx / img.getBoundingClientRect().width * 100) + '%';
+      wrap.style.top = (topPx / img.getBoundingClientRect().height * 100) + '%';
+      wrap.innerHTML =
+        '<input type="hidden" name="added[' + i + '][page]" value="' + PAGE + '">' +
+        '<input type="hidden" name="added[' + i + '][x]" value="' + xPt.toFixed(1) + '">' +
+        '<input type="hidden" name="added[' + i + '][y]" value="' + yPt.toFixed(1) + '">' +
+        '<input type="hidden" name="added[' + i + '][kind]" value="text" data-kind>' +
+        '<input type="text" name="added[' + i + '][text]" maxlength="200" size="12" ' +
+              'autocomplete="off" aria-label="New text" placeholder="type here">' +
+        '<button type="button" class="ov-tick" title="Make this a tick instead" ' +
+              'onclick="asTick(this)">&#10003;</button>' +
+        '<button type="button" class="ov-x" title="Remove" ' +
+              'onclick="dropAdded(this)" aria-label="Remove">x</button>';
+      holder.appendChild(wrap);
+      wrap.querySelector('input[type=text]').focus();
+    }
+
+    /* Turn a new item into a tick box instead of text. */
+    window.asTick = function (btn) {
+      var wrap = btn.closest('.ov-added');
+      wrap.querySelector('[data-kind]').value = 'mark';
+      var text = wrap.querySelector('input[type=text]');
+      text.value = 'X';
+      text.readOnly = true;
+      wrap.classList.add('is-tick');
+      btn.remove();
+    };
+
+    window.dropAdded = function (btn) {
+      btn.closest('.ov-added').remove();
+    };
+  })();
+</script>
+
+{% endblock %}

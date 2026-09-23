@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Clients — Privacy Removal Toolkit{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>Clients</h1>
+    <p class="lede">One YAML file per client in <span class="mono">clients/</span> — the single
+      source of truth for every form and worklist.</p>
+  </div>
+  <a class="btn btn-primary" href="{{ url_for('client_new') }}">New client</a>
+</div>
+
+{% if deleted %}
+  <p class="note note-ok"><strong>Client deleted.</strong>
+    Everything was moved to <span class="mono">trash/{{ deleted }}/</span>, so it can still
+    be put back. Empty that folder when you're sure.</p>
+{% endif %}
+
+{% if not rows %}
+  <div class="card empty">
+    <p>No clients yet.</p>
+    <p><a class="btn btn-primary" href="{{ url_for('client_new') }}">Create the first one</a></p>
+  </div>
+{% else %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Client</th>
+          <th scope="col">Case</th>
+          <th scope="col">County</th>
+          <th scope="col">Category</th>
+          <th scope="col">People</th>
+          <th scope="col">Filled forms</th>
+          <th scope="col">Status</th>
+          <th scope="col"><span class="muted">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td>
+            <strong>{{ row.display_name or row.slug }}</strong><br>
+            <span class="muted mono">clients/{{ row.slug }}.yaml</span>
+          </td>
+          <td>{{ row.case_number or '—' }}</td>
+          <td>{{ row.county or '—' }}</td>
+          <td>
+            {% if row.category %}<span class="tag">{{ row.category.replace('_', ' ') }}</span>
+            {% else %}<span class="muted">not set</span>{% endif %}
+          </td>
+          <td class="num">{{ row.person_count }}</td>
+          <td class="num">
+            {% if row.file_count %}
+              <a href="{{ url_for('client_files', slug=row.slug) }}">{{ row.file_count }}</a>
+            {% else %}
+              <span class="muted">none yet</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if row.error %}
+              <span class="tag" style="border-color: var(--danger); color: var(--danger)">unreadable</span>
+            {% elif row.blocking %}
+              <span class="tag" style="border-color: var(--danger); color: var(--danger)">
+                {{ row.blocking }} to fix</span>
+            {% else %}
+              <span class="tag" style="border-color: var(--ok); color: var(--ok)">ready</span>
+            {% endif %}
+          </td>
+          <td class="actions">
+            {% if row.error %}
+              <span class="muted">{{ row.error | truncate(60) }}</span>
+            {% else %}
+              <a class="btn btn-small" href="{{ url_for('client_edit', slug=row.slug) }}">Edit</a>
+              <a class="btn btn-small" href="{{ url_for('documents_page', slug=row.slug) }}">Documents</a>
+              <a class="btn btn-small" href="{{ url_for('generate_page', slug=row.slug) }}">Generate</a>
+              <a class="btn btn-small btn-danger-quiet"
+                 href="{{ url_for('client_delete_confirm', slug=row.slug) }}">Delete</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+
+<p class="gate"><strong>This tool prepares paperwork only.</strong> Every generated form is
+  reviewed, notarized where the county requires it, and submitted by a person. Eligibility for
+  an exemption is verified by a person, not decided here.</p>
+
+{% endblock %}

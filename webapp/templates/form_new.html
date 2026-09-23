@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Add a form{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>Add a form</h1>
+    <p class="lede">Drop in a blank county PDF and the toolkit works out what it can map.</p>
+  </div>
+  <a class="btn" href="{{ url_for('forms_overview') }}">← All forms</a>
+</div>
+
+{% if error %}<p class="note note-error"><strong>{{ error }}</strong></p>{% endif %}
+
+{% if stage == 'upload' %}
+  <form method="post" action="{{ url_for('form_import_upload') }}"
+        enctype="multipart/form-data">
+    <fieldset>
+      <legend>The blank form</legend>
+      <div class="grid two">
+        <div class="field wide">
+          <label for="pdf">PDF file</label>
+          <input type="file" id="pdf" name="pdf" accept="application/pdf,.pdf" required>
+          <p class="hint">The empty form as the county publishes it — not a filled one.
+            {% if error %}<br><strong>Choose the file again</strong> — a browser won't let
+            a page remember which file you picked. Everything else you typed is still
+            below.{% endif %}</p>
+        </div>
+        <div class="field">
+          <label for="form_key">Short name</label>
+          <input type="text" id="form_key" name="form_key" autocomplete="off"
+                 value="{{ form_key | default('', true) }}"
+                 placeholder="pinellas_clerk_redaction">
+          <p class="hint">Leave blank to use the file name.</p>
+        </div>
+        <div class="field">
+          <label for="county">County</label>
+          <input type="text" id="county" name="county" autocomplete="off"
+                 value="{{ county | default('', true) }}" placeholder="Pinellas">
+        </div>
+        <div class="field wide">
+          <label for="title">Full title</label>
+          <input type="text" id="title" name="title" autocomplete="off"
+                 value="{{ title | default('', true) }}"
+                 placeholder="Clerk of Court — Request for Redaction">
+        </div>
+      </div>
+      <div class="actions-bar">
+        <button type="submit" class="primary">Examine this PDF</button>
+      </div>
+    </fieldset>
+  </form>
+
+  <div class="card">
+    <h2 style="margin-top:0">What it can and can't work out</h2>
+    <p><strong>If the PDF has real form fields</strong> (like the demo form), every field is
+      found and matched to a client detail by name. This is the reliable case.</p>
+    <p><strong>If it's a flat scan</strong> — which most Florida county forms are — it reads the
+      text layer and places each value against the label it belongs to. On your existing forms
+      that finds most of the values but <strong>none of the checkboxes</strong>: on these PDFs
+      the boxes aren't text, so there's nothing to find. You place those yourself.</p>
+    <p><strong>If it's an image with no text at all</strong>, nothing can be detected and every
+      value has to be placed by hand.</p>
+    <p class="muted">Either way you get an editor with the form on screen, and nothing is used
+      for a real filing until you've looked at it.</p>
+  </div>
+
+{% else %}
+  <form method="post" action="{{ url_for('form_import_create') }}">
+    <input type="hidden" name="form_key" value="{{ form_key }}">
+
+    {% if info %}
+      <div class="card">
+        <h2 style="margin-top:0">{{ pdf_name }}</h2>
+        <p>
+          <span class="tag">{{ info.pages }} page{{ '' if info.pages == 1 else 's' }}</span>
+          {% if info.has_fields %}
+            <span class="tag tag-accent">{{ info.fields | length }} form fields</span>
+            <span class="tag">fillable</span>
+          {% else %}
+            <span class="tag">no form fields</span>
+            <span class="tag">overlay</span>
+          {% endif %}
+          {% if info.image_only %}
+            <span class="tag" style="border-color: var(--danger); color: var(--danger)">image only</span>
+          {% else %}
+            <span class="tag">{{ info.word_count }} words of text</span>
+          {% endif %}
+        </p>
+      </div>
+    {% endif %}
+
+    {% if notes %}
+      <div class="note note-warn">
+        <strong>What was found, and what wasn't</strong>
+        <ul>{% for n in notes %}<li>{{ n }}</li>{% endfor %}</ul>
+      </div>
+    {% endif %}
+
+    {% if problems %}
+      <div class="note note-error">
+        <strong>This proposal has problems and can't be saved as-is.</strong>
+        <ul>{% for p in problems %}<li>{{ p }}</li>{% endfor %}</ul>
+      </div>
+    {% endif %}
+
+    <fieldset>
+      <legend>Proposed mapping</legend>
+      <div class="field">
+        <label for="text">You can adjust it here, or create it and use the visual editor</label>
+        <textarea id="text" name="text" rows="20" spellcheck="false" class="mono code">{{ text }}</textarea>
+      </div>
+      <div class="actions-bar">
+        <button type="submit" class="primary">Create this form</button>
+        <a class="btn btn-quiet" href="{{ url_for('form_import_page') }}">Start over</a>
+      </div>
+    </fieldset>
+  </form>
+{% endif %}
+
+{% endblock %}

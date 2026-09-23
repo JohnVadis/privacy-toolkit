@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Generate — {{ display_name }}{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>Generate forms</h1>
+    <p class="lede">{{ display_name }} — output lands in
+      <span class="mono">{{ output_rel }}/</span>, the same folder the CLI writes to.</p>
+  </div>
+  <a class="btn" href="{{ url_for('client_edit', slug=slug) }}">Edit client</a>
+  <a class="btn" href="{{ url_for('documents_page', slug=slug) }}">Documents</a>
+  <a class="btn" href="{{ url_for('client_files', slug=slug) }}">Filled forms</a>
+  <a class="btn" href="{{ url_for('worklist_page', slug=slug) }}">Opt-out worklist</a>
+</div>
+
+{% if errors %}
+  <div class="note note-error">
+    <strong>Nothing was generated — fix these first.</strong>
+    <ul>{% for e in errors %}<li>{{ e.message }}</li>{% endfor %}</ul>
+    <p style="margin:0.6rem 0 0"><a class="btn btn-small" href="{{ url_for('client_edit', slug=slug) }}">Open the client</a></p>
+  </div>
+{% endif %}
+
+{% if warnings %}
+  <div class="note note-warn">
+    <strong>{% if results is none %}Worth checking before you generate.{% else %}Generated, but check these.{% endif %}</strong>
+    <ul>{% for w in warnings %}<li>{{ w.message }}</li>{% endfor %}</ul>
+  </div>
+{% endif %}
+
+<form method="post" action="{{ url_for('generate_run', slug=slug) }}">
+  <fieldset>
+    <legend>People</legend>
+    {% if not people %}
+      <p class="muted">This client has no person with a role set.</p>
+    {% else %}
+      <p class="hint" style="margin-top:0">Leave all unchecked to generate for everyone.</p>
+      <ul class="checklist">
+        {% for p in people %}
+          <li><label class="check">
+            <input type="checkbox" name="persons[]" value="{{ p.role }}"
+                   {% if selected_people and p.role in selected_people %}checked{% endif %}>
+            {{ p.name }} <span class="muted">({{ p.role.replace('_', ' ') }})</span>
+          </label></li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </fieldset>
+
+  <fieldset>
+    <legend>Forms</legend>
+    {% if not forms %}
+      <p class="muted">No mappings with a blank PDF present. See <a href="{{ url_for('forms_overview') }}">Forms</a>.</p>
+    {% else %}
+      <p class="hint" style="margin-top:0">Leave all unchecked to generate every mapped form.</p>
+      <ul class="checklist">
+        {% for m in forms %}
+          <li><label class="check">
+            <input type="checkbox" name="forms[]" value="{{ m.form_key }}"
+                   {% if selected_forms and m.form_key in selected_forms %}checked{% endif %}>
+            <span><span class="mono">{{ m.form_key }}</span>
+              <span class="muted">— {{ m.county or 'form' }}, {{ m.mode }}</span></span>
+          </label></li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </fieldset>
+
+  <div class="actions-bar">
+    <button type="submit" class="primary">Generate</button>
+    <span class="muted">Produces PDFs for review. Nothing is submitted.</span>
+  </div>
+</form>
+
+{% if results is not none %}
+  <h2>Generated {{ results | length }} file{{ '' if results | length == 1 else 's' }}</h2>
+  {% if not results %}
+    <div class="card empty"><p>No forms matched that selection.</p></div>
+  {% else %}
+    <p class="gate"><strong>Next step is yours.</strong> Review each page, notarize where the
+      county requires it, then submit. This tool does not send anything.</p>
+    <div class="results">
+      {% for r in results %}
+        <article class="result">
+          <figure>
+            {# Rendered in memory on request; no second copy of the PII on disk. #}
+            <img loading="lazy" alt="Page 1 of {{ r.form_key }} for {{ r.person }}"
+                 src="{{ url_for('preview_file', slug=slug, filename=r.filename) }}">
+          </figure>
+          <div class="meta">
+            <p><strong class="mono">{{ r.form_key }}</strong><br>
+              <span class="muted">{{ r.person.replace('_', ' ') }}</span></p>
+            <a class="btn btn-small btn-primary"
+               href="{{ url_for('view_file', slug=slug, filename=r.filename) }}">View</a>
+            <a class="btn btn-small"
+               href="{{ url_for('download_file', slug=slug, filename=r.filename) }}"
+               download>Save a copy</a>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+    {% if log %}
+      <details class="log">
+        <summary>Engine output ({{ log | length }} lines)</summary>
+        <pre>{{ log | join('\n') }}</pre>
+      </details>
+    {% endif %}
+  {% endif %}
+{% endif %}
+
+{% endblock %}

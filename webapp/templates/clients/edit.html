@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% set case = client.get('case') or {} %}
+{% set exm = case.get('exemption') or {} %}
+{% block title %}{{ 'New client' if is_new else (case.get('display_name') or slug) }} — Privacy Removal Toolkit{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>{{ 'New client' if is_new else (case.get('display_name') or slug) }}</h1>
+    <p class="lede">
+      {% if is_new %}Entered once; every form and the worklist read from here.
+      {% else %}Saved to <span class="mono">clients/{{ slug }}.yaml</span> — the same file the CLI reads.
+      {% endif %}
+    </p>
+  </div>
+  {% if not is_new %}
+    <a class="btn" href="{{ url_for('documents_page', slug=slug) }}">Documents</a>
+    <a class="btn" href="{{ url_for('client_files', slug=slug) }}">Filled forms</a>
+    <a class="btn" href="{{ url_for('generate_page', slug=slug) }}">Generate forms</a>
+  {% endif %}
+</div>
+
+{% if saved and not errors %}
+  <p class="note note-ok"><strong>Saved.</strong>
+    clients/{{ slug }}.yaml was written. <code class="mono">python fill_forms.py --client
+    clients/{{ slug }}.yaml</code> now produces the same PDFs this app does.</p>
+{% endif %}
+
+{% if errors %}
+  <div class="note note-error">
+    <strong>{{ errors | length }} thing{{ '' if errors | length == 1 else 's' }} to fix before this can be saved.</strong>
+    <ul>{% for e in errors %}<li>{{ e.message }}</li>{% endfor %}</ul>
+  </div>
+{% endif %}
+
+{% if warnings %}
+  <div class="note note-warn">
+    <strong>Worth a look — these won't block saving.</strong>
+    <ul>{% for w in warnings %}<li>{{ w.message }}</li>{% endfor %}</ul>
+  </div>
+{% endif %}
+
+<form method="post"
+      action="{{ url_for('client_create') if is_new else url_for('client_update', slug=slug) }}">
+
+  <fieldset>
+    <legend>Case</legend>
+    <div class="grid two">
+      <div class="field">
+        {% set dn_errs = field_errors.get('case.display_name', []) %}
+        <label for="case[display_name]">Display name <span class="muted">(required)</span></label>
+        <input type="text" id="case[display_name]" name="case[display_name]"
+               value="{{ case.get('display_name', '') }}" placeholder="Lastname, Firstname"
+               autocomplete="off" {% if dn_errs %}aria-invalid="true"{% endif %}>
+        {% for msg in dn_errs %}<p class="field-error">{{ msg }}</p>{% endfor %}
+        {% if not dn_errs %}<p class="hint">Names the output folder and every form title.</p>{% endif %}
+      </div>
+      <div class="field">
+        <label for="case[case_number]">Case number</label>
+        <input type="text" id="case[case_number]" name="case[case_number]"
+               value="{{ case.get('case_number', '') }}" placeholder="QV-2026-001" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="case[agent_name]">Agent name</label>
+        <input type="text" id="case[agent_name]" name="case[agent_name]"
+               value="{{ case.get('agent_name', '') }}" autocomplete="off">
+        <p class="hint">Who signs and submits, if acting as agent.</p>
+      </div>
+      <div class="field">
+        <label for="case[agent_email]">Agent email</label>
+        <input type="email" id="case[agent_email]" name="case[agent_email]"
+               value="{{ case.get('agent_email', '') }}" autocomplete="off">
+      </div>
+      <div class="field wide">
+        <label class="check">
+          <input type="hidden" name="case[acting_as_agent]" value="0">
+          <input type="checkbox" name="case[acting_as_agent]" value="1"
+                 {% if case.get('acting_as_agent') %}checked{% endif %}>
+          Acting as the client's agent
+        </label>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Exemption</legend>
+    <p class="gate"><strong>Eligibility is verified by you, not by this tool.</strong>
+      These fields record the basis you have already confirmed; nothing here decides whether
+      the client qualifies.</p>
+    <div class="grid two">
+      <div class="field">
+        {% set cat_errs = field_errors.get('case.exemption.category', []) %}
+        <label for="case[exemption][category]">Statutory category</label>
+        <select id="case[exemption][category]" name="case[exemption][category]"
+                {% if cat_errs %}aria-invalid="true"{% endif %}>
+          <option value="">— not set —</option>
+          {% for c in categories %}
+            <option value="{{ c }}" {% if exm.get('category') == c %}selected{% endif %}>
+              {{ c.replace('_', ' ') }}</option>
+          {% endfor %}
+        </select>
+        {% for msg in cat_errs %}<p class="field-error">{{ msg }}</p>{% endfor %}
+        {% if not cat_errs %}<p class="hint">Selects the checkbox on each form that has one.</p>{% endif %}
+      </div>
+      <div class="field">
+        <label for="case[exemption][code]">Code</label>
+        <input type="text" id="case[exemption][code]" name="case[exemption][code]"
+               value="{{ exm.get('code', '') }}" placeholder="FL_119_071_4d" autocomplete="off" class="mono">
+      </div>
+      <div class="field">
+        <label for="case[exemption][title]">Title</label>
+        <input type="text" id="case[exemption][title]" name="case[exemption][title]"
+               value="{{ exm.get('title', '') }}" placeholder="Protected professions personnel" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="case[exemption][cite]">Citation</label>
+        <input type="text" id="case[exemption][cite]" name="case[exemption][cite]"
+               value="{{ exm.get('cite', '') }}" placeholder="s. 119.071(4)(d), F.S." autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="case[exemption][job_title]">Job title</label>
+        <input type="text" id="case[exemption][job_title]" name="case[exemption][job_title]"
+               value="{{ exm.get('job_title', '') }}" autocomplete="off">
+        <p class="hint">Required on the Clerk redaction form for employment-based exemptions.</p>
+      </div>
+      <div class="field">
+        <label for="case[exemption][employing_agency]">Employing agency</label>
+        <input type="text" id="case[exemption][employing_agency]" name="case[exemption][employing_agency]"
+               value="{{ exm.get('employing_agency', '') }}" autocomplete="off">
+      </div>
+    </div>
+  </fieldset>
+
+  <h2>People</h2>
+  {% set person_errs = field_errors.get('persons', []) %}
+  {% for msg in person_errs %}<p class="field-error">{{ msg }}</p>{% endfor %}
+  <div id="persons">
+    {% for person in (client.get('persons') or []) %}
+      {% set p = person %}{% set pi = loop.index0 %}
+      {% include "clients/_person.html" %}
+    {% endfor %}
+  </div>
+  <button type="button" class="btn-small"
+          hx-get="{{ url_for('fragment_person') }}"
+          hx-vals='js:{index: nextIndex("persons")}'
+          hx-target="#persons" hx-swap="beforeend">+ Add person</button>
+
+  <div class="actions-bar">
+    <button type="submit" class="primary">{{ 'Create client' if is_new else 'Save changes' }}</button>
+    <a class="btn btn-quiet" href="{{ url_for('client_list') }}">Cancel</a>
+    <span class="spacer"></span>
+    {% if not is_new %}
+      <a class="btn btn-danger-quiet" href="{{ url_for('client_delete_confirm', slug=slug) }}">Delete client</a>
+      <a class="btn" href="{{ url_for('generate_page', slug=slug) }}">Generate forms →</a>
+    {% endif %}
+  </div>
+</form>
+
+{% endblock %}

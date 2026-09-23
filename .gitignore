@@ -1,0 +1,18 @@
+# Never commit real client PII or generated output
+clients/*.yaml
+!clients/_TEMPLATE.yaml
+!clients/example_client.yaml
+output/
+forms/_blank_pdfs/*.pdf
+!forms/_blank_pdfs/demo_redaction.pdf
+__pycache__/
+*.pyc
+.venv/
+venv/
+trash/
+
+# Screenshots taken by the Comment feature show client data
+feedback/
+build/
+dist/
+*.spec

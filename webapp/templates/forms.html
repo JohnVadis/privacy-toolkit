@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Forms — Privacy Removal Toolkit{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>Forms</h1>
+    <p class="lede">One mapping per form in <span class="mono">forms/mappings/</span>, written once
+      and reused for every client. Adding a county means adding a mapping, not code.</p>
+  </div>
+  <a class="btn btn-primary" href="{{ url_for('form_import_page') }}">Add a form</a>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Form</th>
+        <th scope="col">County</th>
+        <th scope="col">Mode</th>
+        <th scope="col">Category coverage</th>
+        <th scope="col">Blank PDF</th>
+        <th scope="col"><span class="muted">Actions</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in mappings %}
+      <tr>
+        <td>
+          <strong class="mono">{{ m.form_key }}</strong>
+          {% if m.title %}<br><span class="muted">{{ m.title }}</span>{% endif %}
+        </td>
+        <td>{{ m.county or '—' }}</td>
+        <td>
+          {% if m.mode == 'overlay' %}
+            <span class="tag">overlay</span>
+          {% else %}
+            <span class="tag tag-accent">fillable</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if m.categories %}
+            {% for c in m.categories %}<span class="tag">{{ c.replace('_', ' ') }}</span>{% endfor %}
+          {% else %}
+            <span class="muted">no category checkbox</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if m.error %}
+            <span class="tag" style="border-color: var(--danger); color: var(--danger)">unreadable</span>
+          {% elif m.pdf_present %}
+            <span class="muted mono">{{ m.pdf }}</span>
+          {% else %}
+            <span class="tag" style="border-color: var(--danger); color: var(--danger)">missing</span>
+            <br><span class="muted mono">{{ m.pdf }}</span>
+          {% endif %}
+        </td>
+        <td class="actions">
+          {% if not m.error %}
+            <a class="btn btn-small" href="{{ url_for('mapping_edit_page', form_key=m.form_key) }}">Edit</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">Reading this table</h2>
+  <p><strong>Mode</strong> is how values land on the page. <em>fillable</em> writes into the PDF's
+    own AcroForm fields; <em>overlay</em> stamps text onto a flat scan by anchor or coordinate,
+    which is the common case for Florida county forms.</p>
+  <p><strong>Category coverage</strong> lists the statutory categories
+    ({{ categories | join(', ') | replace('_', ' ') }}) that form has a checkbox rule for. A client's
+    category is set once in their file; each form then marks its own box. A form showing
+    <em>no category checkbox</em> simply doesn't ask.</p>
+  <p><strong>Edit</strong> opens a mapping with the blank form beside it: click the page
+    to get a coordinate, and preview the filled result against a real client before
+    saving. Every save keeps a backup. Adding a brand-new form still starts with
+    <span class="mono">docs/adding-forms.md</span>.</p>
+</div>
+
+{% endblock %}

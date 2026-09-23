@@ -1,0 +1,11 @@
+{# One phone or email row. Rendered inline on load and by the HTMX fragment route. #}
+<div class="repeat-row">
+  <input type="text" name="persons[{{ pi }}][{{ kind }}][]" value="{{ value }}"
+         {% if kind == 'emails' %}
+           inputmode="email" placeholder="name@example.com" aria-label="Email address"
+         {% else %}
+           inputmode="tel" placeholder="813-555-0100" aria-label="Phone number"
+         {% endif %}>
+  <button type="button" class="btn-quiet btn-small" onclick="removeRow(this, '.repeat-row')"
+          aria-label="Remove this {{ 'email address' if kind == 'emails' else 'phone number' }}">Remove</button>
+</div>

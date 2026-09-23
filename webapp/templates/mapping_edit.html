@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% block title %}{{ meta.title or form_key }} — form layout{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>{{ meta.title or form_key }}</h1>
+    <p class="lede">{{ meta.county or 'Form' }} · {{ meta.mode }} ·
+      <span class="mono">{{ form_key }}</span></p>
+  </div>
+  <a class="btn" href="{{ url_for('forms_overview') }}">← All forms</a>
+</div>
+
+{% if imported %}
+  <p class="note note-ok"><strong>Form added.</strong> Check every marker below: drag
+    anything in the wrong place, and add what wasn't detected.</p>
+{% endif %}
+{% if saved %}
+  <p class="note note-ok"><strong>Saved.</strong> The previous version was kept in
+    <span class="mono">forms/mappings/_backups/</span>.</p>
+{% endif %}
+{% if problems %}
+  <div class="note note-error">
+    <strong>Not saved — {{ problems | length }} problem{{ '' if problems | length == 1 else 's' }}.</strong>
+    <ul>{% for p in problems %}<li>{{ p }}</li>{% endfor %}</ul>
+  </div>
+{% endif %}
+
+<p class="note note-warn"><strong>This layout is used for every client.</strong>
+  A marker in the wrong place puts a value in the wrong box on a government form, for
+  everyone, and nothing will warn you. Preview it against a real client before saving.</p>
+
+<form method="post" action="{{ url_for('mapping_save', form_key=form_key) }}" id="map-form">
+  <input type="hidden" name="ops" id="ops" value="">
+  <input type="hidden" name="page" id="page-field" value="{{ page }}">
+  <input type="hidden" name="text" id="text" value="">
+
+  <div class="editor-bar">
+    <span class="muted">Page</span>
+    {% for n in range(1, page_count + 1) %}
+      <a class="btn btn-small {% if n == page %}btn-primary{% endif %}"
+         href="{{ url_for('mapping_edit_page', form_key=form_key) }}?page={{ n }}"
+         data-nav>{{ n }}</a>
+    {% endfor %}
+
+    <span class="bar-sep"></span>
+    <button type="button" class="btn btn-small" id="add-text-btn">+ Value</button>
+    <button type="button" class="btn btn-small" id="add-mark-btn">+ Tick box</button>
+
+    <span class="spacer"></span>
+    <select id="preview-client" name="client" class="inline-select" aria-label="Preview against">
+      <option value="{{ example_slug }}">Example client (made-up details)</option>
+      {% for c in clients %}
+        <option value="{{ c.slug }}" {% if c.slug == preview_client %}selected{% endif %}>
+          {{ c.display_name or c.slug }}</option>
+      {% endfor %}
+    </select>
+    <button type="button" class="btn btn-small" id="preview-btn">Preview</button>
+    <button type="button" class="btn btn-small btn-quiet" id="blank-btn" hidden>Blank form</button>
+  </div>
+
+  <div class="editor-grid">
+    <div>
+      <div class="page-canvas" id="canvas" data-w="{{ size[0] }}" data-h="{{ size[1] }}"
+           data-page="{{ page }}">
+        <img id="page-img" alt="Page {{ page }} of {{ meta.title or form_key }}"
+             src="{{ url_for('blank_page_png', form_key=form_key, page=page) }}" draggable="false">
+        {% for pin in pins %}
+          {% if pin.page == page %}
+            {# Left edge and BASELINE sit on the draw point, and the box is as wide
+               as the value really is — so the marker covers what will be printed. #}
+            <button type="button"
+                    class="marker {{ 'is-mark' if pin.kind == 'mark' else 'is-text' }}"
+                    data-index="{{ pin.index }}" data-x="{{ pin.x }}" data-y="{{ pin.y }}"
+                    data-w="{{ pin.w }}" data-h="{{ pin.h }}"
+                    style="left:{{ pin.x / size[0] * 100 }}%;
+                           top:{{ (size[1] - pin.y) / size[1] * 100 }}%;
+                           width:{{ pin.w / size[0] * 100 }}%;
+                           height:{{ pin.h / size[1] * 100 }}%"
+                    aria-label="{{ pin.label }} — select, then use arrow keys to move">
+              <span class="tag-name">{{ pin.label }}</span>
+            </button>
+          {% endif %}
+        {% endfor %}
+      </div>
+
+      <p class="hint" id="canvas-hint">
+        Click a marker to select it. Drag it, or nudge with the arrow keys
+        (hold Shift for bigger steps). Markers on other pages are left alone.
+      </p>
+    </div>
+
+    <aside id="panel" class="panel">
+      <div id="panel-empty">
+        <h2 style="margin-top:0">Nothing selected</h2>
+        <p class="muted">Click a marker on the form to see what it writes and where.</p>
+        <p class="muted">Use <strong>+ Value</strong> or <strong>+ Tick box</strong>, then
+          click the spot on the form to place it.</p>
+        <h3>Keys</h3>
+        <ul class="keys">
+          <li><kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> move 1 pt</li>
+          <li><kbd>Shift</kbd> + arrows move 10 pt</li>
+          <li><kbd>Delete</kbd> removes the selected marker</li>
+          <li><kbd>Esc</kbd> deselects</li>
+        </ul>
+      </div>
+
+      <div id="panel-entry" hidden>
+        <h2 style="margin-top:0" id="panel-title">Marker</h2>
+
+        <div class="field">
+          <label for="f-source">What it writes</label>
+          <select id="f-source">
+            <option value="variable">A client detail</option>
+            <option value="literal">Fixed text</option>
+            <option value="mark">A tick in a box</option>
+          </select>
+        </div>
+
+        <div class="field" id="row-variable">
+          <label for="f-from">Which detail</label>
+          <select id="f-from">
+            {% for group, items in variables %}
+              <optgroup label="{{ group }}">
+                {% for key, label in items %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+              </optgroup>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="field" id="row-literal" hidden>
+          <label for="f-literal">Text</label>
+          <input type="text" id="f-literal" maxlength="200" autocomplete="off">
+        </div>
+
+        <div class="field" id="row-when" hidden>
+          <label for="f-when">Tick it</label>
+          <select id="f-when">
+            <option value="">always</option>
+            {% for field, spec in conditions.items() %}
+              {% for value in spec[1] %}
+                <option value="{{ field }}|{{ value }}">only when {{ spec[0] | lower }} is
+                  {{ value.replace('_', ' ') }}</option>
+              {% endfor %}
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="grid">
+          <div class="field">
+            <label for="f-x">Across (x)</label>
+            <input type="number" id="f-x" step="0.5" inputmode="decimal">
+          </div>
+          <div class="field">
+            <label for="f-y">Up (y)</label>
+            <input type="number" id="f-y" step="0.5" inputmode="decimal">
+          </div>
+          <div class="field">
+            <label for="f-size">Text size</label>
+            <input type="number" id="f-size" min="4" max="36" step="1" placeholder="10">
+          </div>
+          <div class="field">
+            <label for="f-page">Page</label>
+            <input type="number" id="f-page" min="1" max="{{ page_count }}">
+          </div>
+        </div>
+
+        <p class="hint" id="anchor-note" hidden>
+          Positioned from a label on the form (<span class="mono" id="anchor-text"></span>),
+          so moving it stores an offset and it keeps following that label if the county
+          reflows the page.
+        </p>
+
+        <div class="actions-bar">
+          <button type="button" class="btn btn-small btn-danger-quiet" id="delete-btn">
+            Delete marker</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="actions-bar">
+    <button type="submit" class="primary" id="save-btn">Save layout</button>
+    <a class="btn btn-quiet" href="{{ url_for('mapping_edit_page', form_key=form_key) }}">
+      Discard changes</a>
+    <span class="muted" id="dirty-note">No changes yet</span>
+  </div>
+
+  <details class="log" id="advanced" {% if problems %}open{% endif %}>
+    <summary>The mapping file</summary>
+    <p class="hint">Everything above edits this file. Type in it only if you need
+      something the panel doesn't offer — what you type here is used as-is, and the
+      marker changes are applied on top of it.</p>
+    <textarea id="raw-text" rows="20" spellcheck="false" class="mono code">{{ text }}</textarea>
+  </details>
+</form>
+
+{% if backups %}
+  <h2>Previous versions</h2>
+  <p class="hint">Kept on every save in <span class="mono">forms/mappings/_backups/</span>.
+    Copy one back by hand to undo.</p>
+  <ul class="muted mono" style="font-size:0.8rem">
+    {% for b in backups %}<li>{{ b }}</li>{% endfor %}
+  </ul>
+{% endif %}
+
+<script>
+  window.MAPPING_EDITOR = {
+    pins: {{ pins | tojson }},
+    page: {{ page }},
+    pageCount: {{ page_count }},
+    size: {{ size | tojson }},
+    blankUrl: {{ url_for('blank_page_png', form_key=form_key, page=1) | tojson }},
+    exampleSlug: {{ example_slug | tojson }},
+    previewUrl: {{ url_for('mapping_preview', form_key=form_key, page=1) | tojson }}
+  };
+</script>
+<script src="{{ url_for('static', path='/mapping-editor.js') }}" defer></script>
+
+{% endblock %}
