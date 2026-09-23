@@ -72,15 +72,19 @@ Open follow-ups, if the worker asks for them:
 
 ## Hardening (added 2026-09-21, ranked by what would hurt most)
 
-### H1. The worklist overwrites tracked work
-`build_worklist` always writes the same `opt_out_worklist.xlsx`. A worker fills in
-Status / Submitted / Confirmation over weeks; rebuilding — or building for a different
-person — silently destroys it. Merge into the existing file, or refuse to clobber one
-that has been edited. **Highest priority.**
+### H1. The worklist overwrites tracked work — **DONE (2026-09-23)**
+Rebuilding now merges: Status / Submitted / Confirmation / Verify-by / Notes are read
+back out of the existing sheet and carried across, matched on a hidden Key column
+(site name for sheets built before it). Rows for sites that have left the catalog are
+kept and marked, and the previous file is copied to `_worklist_backups/` first. The
+catalog's own text moved to a separate "Site guidance" column so merging is not
+ambiguous about whose note is whose.
 
 ### H2. No backup or export
 `clients/` and `output/` exist once, on one machine. An "export case" zip would give
-something to put somewhere safe.
+something to put somewhere safe. **Partly addressed (2026-09-23):** client files are
+now versioned locally in `clients/_backups/<slug>/` on every save, and the repo is
+under git — but that is still one machine, and neither covers `output/`.
 
 ### H3. Flatten output + log generations (was #9)
 Filled values are still live text, and nothing records what was produced for whom and

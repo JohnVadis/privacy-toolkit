@@ -23,8 +23,10 @@ Current scope: **Hillsborough County, FL**. Four forms wired and verified.
    none should be added.
 3. **Opt-out sites are prepared, not submitted.** They gate on CAPTCHAs and email
    verification; `build_worklist.py` produces values + a status tracker, a human clicks.
-4. **PII never gets committed.** `clients/`, `output/` and `trash/` are gitignored. SSN
-   is never stored anywhere (the FL redaction workflow doesn't need it).
+4. **PII never gets committed.** `clients/*` (including `_backups/`), `output/`,
+   `trash/` and `feedback/` are gitignored. SSN is never stored anywhere (the FL
+   redaction workflow doesn't need it). Check `git check-ignore` before adding any
+   new folder that touches client data.
 5. **Keep it deterministic.** No LLM/API calls in the fill path. If a task seems to
    need judgment (classifying results, reading logs), that's a separate, out-of-band
    step — not part of these scripts.
@@ -76,7 +78,8 @@ python make_test_copy.py --zip   # source copy, needs Python; allowlist + PII sc
 python pdf_fill.py forms/_blank_pdfs/<form>.pdf          # lists fillable fields
 python scaffold_mapping.py forms/_blank_pdfs/<form>.pdf <form_key>
 ```
-Output lands in `output/<client_slug>/`.
+Output lands in `output/<client file name>/` — keyed on the client FILE, not the
+display name, because two clients can share a display name and then share a folder.
 
 ## Architecture (one line each)
 - `clients/<name>.yaml` — single source of truth per client (people, addresses, identifiers, exemption).
@@ -84,7 +87,10 @@ Output lands in `output/<client_slug>/`.
   Frozen into an .exe, `ROOT` is the .exe's folder (user data) and `BUNDLED` is the temp
   unpack dir (templates/static). Never write user data under `BUNDLED` — it is deleted
   on exit.
-- `client_context.py` — flattens a client file into template variables for a chosen person.
+- `client_context.py` — load/save a client file and flatten it into template variables.
+  `save_client()` is atomic (temp + fsync + os.replace), backs the previous version up
+  to `clients/_backups/<slug>/`, and takes a lock so the CLI and the app can't
+  interleave. `output_dir()` lives here too — one definition, used by everything.
 - `forms/mappings/<key>.map.yaml` — one per form, written ONCE, reused for every client. Declares `mode: fillable` or `mode: overlay`.
 - `pdf_fill.py` — writes values into AcroForm fields (fillable PDFs).
 - `pdf_overlay.py` — stamps values by anchor/coordinate onto flat scans (most county forms).
@@ -114,12 +120,16 @@ Output lands in `output/<client_slug>/`.
   fill (stamping over existing text would overlap). Keyed by entry position/field name,
   with `from:` re-checked so a mapping edit can't move one onto another field.
 - `marks:` on a client — force a tick box on or off, beating the mapping's own rule.
+  Carries `at:` (a `mark_signature()` of where the mark lands) which is re-checked at
+  fill time, so reordering a mapping can't move someone's tick to another box.
 - `corrections:` on a client — extra overlay entries stamped AFTER the mapping, for
   blanks no entry covers.
 - All three live in `model.UNMANAGED_KEYS`; drop one and a client save wipes it.
 - `pdf_overlay.entry_position()` is what lets the editor place a control exactly where
   the engine will draw, anchors included. Keep resolve_entries using it.
 - `sites.yaml` + `build_worklist.py` — opt-out catalog → per-client tracker (.xlsx).
+  Rebuilding MERGES: the worker's Status/Submitted/Confirmation/Notes are read back
+  out and carried across, matched on a hidden Key column. Never make it overwrite.
 - `webapp/` — FastAPI + HTMX UI in a desktop window. Imports the engine; no fill logic of its own.
 - `webapp/security.py` — Host / cross-site / session-token gate in front of every request.
 - `webapp/desktop.py` — the pywebview window; server on a background thread. Downloads
