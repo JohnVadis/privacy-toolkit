@@ -38,6 +38,15 @@ for name in ("forms",):
 if (REPO / "sites.yaml").is_file():
     shutil.copy2(REPO / "sites.yaml", _SANDBOX / "sites.yaml")
 
+# The web app resolves its templates and static files against BUNDLED, which follows
+# ROOT — so they have to exist in the sandbox too, or every page render 500s. The
+# Python package itself is still imported from the repo via sys.path below.
+for name in ("templates", "static"):
+    src = REPO / "webapp" / name
+    if src.is_dir():
+        shutil.copytree(src, _SANDBOX / "webapp" / name,
+                        ignore=shutil.ignore_patterns("__pycache__"))
+
 sys.path.insert(0, str(REPO))
 
 import paths  # noqa: E402  (must follow the env var above)
@@ -86,6 +95,32 @@ def saved_client(example_client):
 
     save_client("Example Client", example_client)
     return load_client(client_path("Example Client"))
+
+
+@pytest.fixture
+def raw_client():
+    """A test client with NO session token — for exercising the gate itself.
+
+    base_url is loopback because the Host check is the first thing the middleware
+    does, and TestClient's default "testserver" is exactly the foreign host it
+    exists to refuse.
+    """
+    from fastapi.testclient import TestClient
+
+    from webapp.main import app
+
+    with TestClient(app, base_url="http://127.0.0.1") as client:
+        yield client
+
+
+@pytest.fixture
+def app_client(raw_client):
+    """A test client holding this session's token — for exercising the routes."""
+    from webapp.security import SESSION_TOKEN
+
+    raw_client.cookies.set("ptk", SESSION_TOKEN)
+    raw_client.headers.update({"Sec-Fetch-Site": "same-origin"})
+    return raw_client
 
 
 def blank_pdf(name: str) -> Path:

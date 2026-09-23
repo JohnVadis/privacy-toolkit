@@ -2,3 +2,4 @@
 # lean so "Start Privacy Toolkit.bat" stays a fast install for a non-technical user.
 -r requirements.txt
 pytest>=8.0
+httpx2>=0.28          # starlette's TestClient, for the webapp route tests

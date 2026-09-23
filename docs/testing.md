@@ -11,8 +11,9 @@ pytest -k worklist                          # one area
 
 `tests/conftest.py` points `paths.ROOT` at a temporary directory — via the
 `PRIVACY_TOOLKIT_HOME` environment variable — **before any toolkit module is
-imported**, and asserts the redirect took effect. `forms/` and `sites.yaml` are
-copied in so mappings resolve normally.
+imported**, and asserts the redirect took effect. `forms/`, `sites.yaml` and the
+web app's `templates/` and `static/` are copied in, so mappings resolve and pages
+render normally. (The Python package itself is still imported from the repo.)
 
 That means the tests exercise the real save, delete and fill paths rather than
 mocks, while a bug in one of those paths destroys a temp folder instead of
@@ -36,6 +37,11 @@ for previews.
 | `test_validate_client.py` | That validation blocks what it should, warns about the rest, and never decides eligibility. |
 | `test_mapping_edit.py` | That **every shipped mapping still checks clean**, plus the structural rules. |
 | `test_golden_hillsborough.py` | The one that protects a filing: named values at known coordinates on the county's own PDF. |
+| `test_webapp_security.py` | The Host / cross-site / token gate, check by check. Golden rule #7 says don't weaken it; this is what makes weakening it fail. |
+| `test_webapp_model.py` | Posted form data → client file: the bracket convention, sparse rows, the residence radio, and that unmanaged keys survive a save. |
+| `test_webapp_routes.py` | Create / edit / delete / generate / worklist through the real app, plus the slug and filename guards. |
+| `test_webapp_documents.py` | The import and the row picker: preview saves nothing, none-ticked is refused, party names never reach the file. |
+| `test_webapp_corrections.py` | Hand edits stored against the client, and both drift guards end to end through the route. |
 
 ## The golden test
 
@@ -59,6 +65,16 @@ new assertion:
 - Extracted `y` is the glyph *bottom*, two or three points below the baseline the
   mapping drew on, which is why coordinates are checked to ~4pt rather than exactly.
 
+## The web app
+
+`app_client` is a `TestClient` holding this session's token, with a loopback
+`base_url` — TestClient's default `testserver` is exactly the foreign Host the gate
+exists to refuse. `raw_client` has no token, for testing the gate itself.
+
+The route tests drive the real app: they write client files, generate PDFs and build
+spreadsheets, all inside the sandbox. Nothing is mocked, so a broken route fails here
+rather than in front of a worker.
+
 ## Adding to it
 
 Prefer a test that would have caught a real defect. Every case in
@@ -67,3 +83,10 @@ wipe the sheet; the drift tests exist because a reordered mapping used to move a
 hand-set tick. Two of the tests here found live bugs the day they were written — an
 unreachable error branch in `documents.decode`, and a tracking check that counted
 every worklist row as worked-on.
+
+Writing them also turned up a gap worth knowing about: if a mapping edit leaves a
+stored tick's index pointing at something that is no longer a tick box at all, the
+tick is quietly ignored rather than reported. It cannot mark the wrong box, so it is
+safe — but it is silent, and
+`test_webapp_corrections.py::test_a_tick_is_ignored_when_its_index_is_no_longer_a_box_at_all`
+pins that behaviour so a future change is a deliberate one.

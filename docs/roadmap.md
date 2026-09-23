@@ -99,8 +99,13 @@ without the gitignored blank PDFs, so CI runs the rest). The suite redirects
 `paths.ROOT` to a temp dir before importing anything, so it exercises the real save
 and delete paths without going near real client data. See `docs/testing.md`.
 
-Still open: no coverage of `webapp/` routes (the security gate, the HTMX fragments,
-the document picker) — those were checked by driving the running app by hand.
+The web app is covered too (2026-09-23): the security gate check by check, the
+form-data → client-file layer, create/edit/delete/generate/worklist through the real
+app, the document import and row picker, and hand corrections with both drift guards.
+374 tests in all.
+
+Still open: the mapping editor and form-import routes (`webapp/routers/forms.py`) and
+the Comment feature (`feedback.py`) have no tests — both were checked by hand.
 
 ### H5. `trash/` is never pruned
 Deleted clients accumulate with their PII.

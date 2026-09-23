@@ -246,7 +246,7 @@ python build_worklist.py --client clients/lastname_firstname.yaml
 pip install -r requirements-dev.txt
 pytest
 ```
-236 tests, about eleven seconds, and they never touch `clients/` or `output/` — the
+374 tests, under twenty seconds, and they never touch `clients/` or `output/` — the
 suite points the toolkit at a temporary directory first. The one test that fills the
 real Clerk form and checks every coordinate skips unless the county blank PDFs are
 present. Details in `docs/testing.md`.
