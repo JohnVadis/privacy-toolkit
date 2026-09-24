@@ -84,7 +84,12 @@ HIDDEN = [
 ]
 
 # The webview backend differs, and PyInstaller only finds the one it can see.
-HIDDEN += (["webview.platforms.cocoa"] if MACOS
+HIDDEN += (["webview.platforms.cocoa",
+            # Quartz is imported inside a function so PyInstaller never sees it.
+            # Without it the app cannot identify its own window and the Comment
+            # feature falls back to photographing the entire desktop.
+            "Quartz", "AppKit", "Foundation", "objc"]
+           if MACOS
            else ["webview.platforms.edgechromium", "webview.platforms.winforms"])
 
 EXCLUDE = ["tkinter", "matplotlib", "numpy", "pytest", "PyInstaller", "pymupdf", "fitz"]

@@ -126,36 +126,94 @@ class TestWindowCapture:
         monkeypatch.setattr(sys, "platform", "win32")
         assert engine._mac_window("anything") is None
 
+    def _fake_quartz(self, windows, permission=True):
+        fake = type(sys)("Quartz")
+        fake.CGWindowListCopyWindowInfo = lambda *a: windows
+        fake.kCGNullWindowID = 0
+        fake.kCGWindowListOptionOnScreenOnly = 1
+        fake.CGPreflightScreenCaptureAccess = lambda: permission
+        fake.CGRequestScreenCaptureAccess = lambda: None
+        return fake
+
+    def _window(self, pid, w=1180, h=860, number=42, name=""):
+        return {"kCGWindowOwnerPID": pid, "kCGWindowNumber": number,
+                "kCGWindowName": name,
+                "kCGWindowBounds": {"Width": w, "Height": h}}
+
     def test_macos_capture_asks_screencapture_for_one_window(self, monkeypatch):
+        import os
+
         monkeypatch.setattr(sys, "platform", "darwin")
         seen = {}
 
         def fake_run(args, **kwargs):
             seen["args"] = args
-            Path(args[-1]).write_bytes(b"")     # produce nothing usable
+            Path(args[-1]).write_bytes(b"")       # produce nothing usable
             return type("R", (), {"returncode": 1})()
 
         monkeypatch.setattr("subprocess.run", fake_run)
-        fake_quartz = type(sys)("Quartz")
-        fake_quartz.CGWindowListCopyWindowInfo = lambda *a: [
-            {"kCGWindowName": "Privacy Removal Toolkit", "kCGWindowNumber": 42}]
-        fake_quartz.kCGNullWindowID = 0
-        fake_quartz.kCGWindowListOptionOnScreenOnly = 1
-        monkeypatch.setitem(sys.modules, "Quartz", fake_quartz)
+        monkeypatch.setitem(sys.modules, "Quartz",
+                            self._fake_quartz([self._window(os.getpid())]))
 
         assert engine._mac_window("Privacy Removal Toolkit") is None   # capture failed
         assert seen["args"][0] == "screencapture"
         assert "-l" in seen["args"] and "42" in seen["args"]
 
-    def test_macos_capture_gives_up_when_the_window_is_not_found(self, monkeypatch):
+    def test_macos_finds_our_window_even_when_the_title_is_hidden(self, monkeypatch):
+        # macOS only reveals window TITLES to apps that already hold Screen
+        # Recording, so a title lookup fails on exactly the machines that need it
+        # and silently falls through to photographing the whole desktop.
+        import os
+
         monkeypatch.setattr(sys, "platform", "darwin")
-        fake_quartz = type(sys)("Quartz")
-        fake_quartz.CGWindowListCopyWindowInfo = lambda *a: [
-            {"kCGWindowName": "Some Other App", "kCGWindowNumber": 7}]
-        fake_quartz.kCGNullWindowID = 0
-        fake_quartz.kCGWindowListOptionOnScreenOnly = 1
-        monkeypatch.setitem(sys.modules, "Quartz", fake_quartz)
+        seen = {}
+        monkeypatch.setattr("subprocess.run",
+                            lambda args, **k: seen.setdefault("args", args) or
+                            type("R", (), {"returncode": 1})())
+        monkeypatch.setitem(sys.modules, "Quartz", self._fake_quartz(
+            [self._window(os.getpid(), number=7, name="")]))    # no title at all
+
+        engine._mac_window("Privacy Removal Toolkit")
+        assert "7" in seen["args"]
+
+    def test_macos_ignores_windows_belonging_to_other_apps(self, monkeypatch):
+        import os
+
+        monkeypatch.setattr(sys, "platform", "darwin")
+        monkeypatch.setitem(sys.modules, "Quartz", self._fake_quartz(
+            [self._window(os.getpid() + 1, number=99, name="Someone Else")]))
         assert engine._mac_window("Privacy Removal Toolkit") is None
+
+    def test_macos_ignores_tooltips_and_shadows(self, monkeypatch):
+        import os
+
+        monkeypatch.setattr(sys, "platform", "darwin")
+        monkeypatch.setitem(sys.modules, "Quartz", self._fake_quartz(
+            [self._window(os.getpid(), w=20, h=20)]))     # too small to be the app
+        assert engine._mac_window("Privacy Removal Toolkit") is None
+
+    def test_macos_refuses_rather_than_photographing_the_desktop(self, monkeypatch):
+        # Without permission screencapture returns a correctly sized image showing
+        # the desktop, so the feature looks like it worked and attaches the wrong
+        # picture to an email. Refusing is the only honest outcome.
+        import os
+
+        monkeypatch.setattr(sys, "platform", "darwin")
+        monkeypatch.setitem(sys.modules, "Quartz", self._fake_quartz(
+            [self._window(os.getpid())], permission=False))
+
+        with pytest.raises(engine.ScreenPermissionNeeded):
+            engine._mac_window("Privacy Removal Toolkit")
+
+    def test_asking_for_permission_pops_the_system_dialog_once(self, monkeypatch):
+        monkeypatch.setattr(sys, "platform", "darwin")
+        asked = []
+        fake = self._fake_quartz([], permission=False)
+        fake.CGRequestScreenCaptureAccess = lambda: asked.append(True)
+        monkeypatch.setitem(sys.modules, "Quartz", fake)
+
+        assert engine._mac_screen_permission() is False
+        assert asked
 
     def test_a_missing_quartz_is_not_fatal(self, monkeypatch):
         monkeypatch.setattr(sys, "platform", "darwin")

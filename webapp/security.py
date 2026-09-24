@@ -59,17 +59,17 @@ class LocalOnlyMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         # --- 1. Host -------------------------------------------------------
         if _hostname(request.headers.get("host", "")) not in ALLOWED_HOSTNAMES:
-            return PlainTextResponse("Forbidden.", status_code=403)
+            return _refused("this request named a different host")
 
         # --- 2. cross-site --------------------------------------------------
         fetch_site = request.headers.get("sec-fetch-site")
         if fetch_site is not None:
             if fetch_site not in ("same-origin", "none") and not _entry_navigation(request):
-                return PlainTextResponse("Forbidden.", status_code=403)
+                return _refused(f"this request came from {fetch_site}")
         else:
             origin = request.headers.get("origin")
             if origin and _hostname(origin.split("//", 1)[-1]) not in ALLOWED_HOSTNAMES:
-                return PlainTextResponse("Forbidden.", status_code=403)
+                return _refused("this request came from another site")
 
         # --- 3. token -------------------------------------------------------
         if request.url.path not in TOKEN_EXEMPT_PATHS:
@@ -89,6 +89,21 @@ class LocalOnlyMiddleware(BaseHTTPMiddleware):
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("Referrer-Policy", "no-referrer")
         return response
+
+
+def _refused(because: str) -> PlainTextResponse:
+    """A refusal that says which check fired.
+
+    "Forbidden." on its own told a tester nothing they could report and told me
+    nothing I could act on. Naming the check reveals nothing an attacker does not
+    already know — they can see which request they sent — and turns a dead end into
+    a bug report.
+    """
+    return PlainTextResponse(
+        f"Forbidden — {because}.\n\n"
+        "This app only answers its own window. If you are seeing this in normal use "
+        "it is a bug worth reporting, along with this line.",
+        status_code=403)
 
 
 def _entry_navigation(request) -> bool:

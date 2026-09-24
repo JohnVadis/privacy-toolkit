@@ -58,20 +58,47 @@ def capture(title: str = WINDOW_TITLE) -> bytes:
     return buf.getvalue()
 
 
+class ScreenPermissionNeeded(Exception):
+    """macOS has not granted Screen Recording, so a capture would be a lie.
+
+    Without it, screencapture returns an image of the right SIZE showing only the
+    desktop — so the feature appears to work and quietly attaches the wrong picture
+    to an email. Refusing and saying why is the only honest option.
+    """
+
+
+def _mac_screen_permission() -> bool:
+    """True if this process may capture the screen. Asks for it the first time."""
+    try:
+        import Quartz
+    except ImportError:
+        return True                      # can't tell; let the capture try
+    preflight = getattr(Quartz, "CGPreflightScreenCaptureAccess", None)
+    if preflight is None:
+        return True                      # older macOS: no permission model
+    if preflight():
+        return True
+    request = getattr(Quartz, "CGRequestScreenCaptureAccess", None)
+    if request:
+        request()                        # pops the system dialog, once
+    return False
+
+
 def _mac_window(title: str):
-    """Capture one window on macOS. PIL Image, or None.
+    """Capture this app's own window on macOS. PIL Image, or None.
 
-    `screencapture -l <window id>` is part of the OS and captures a single window
-    including its shadow-free contents; Quartz finds the id by the window's title.
-    pyobjc ships with pywebview on macOS, so both are already present.
-
-    macOS will ask for Screen Recording permission the first time. Until it is
-    granted the capture comes back empty rather than failing, which is why an
-    all-but-blank result is rejected here instead of being attached to an email.
+    Found by OWNER PID, not by title. macOS only reveals window titles to apps that
+    already hold Screen Recording permission, so a title lookup fails on exactly the
+    machines where it matters — and silently, by falling through to a grab of the
+    whole desktop. The webview runs in this process, so our PID always matches.
     """
     if sys.platform != "darwin":
         return None
+    if not _mac_screen_permission():
+        raise ScreenPermissionNeeded(
+            "macOS has not given this app permission to capture the screen.")
     try:
+        import os
         import subprocess
         import tempfile
 
@@ -79,15 +106,21 @@ def _mac_window(title: str):
         from Quartz import (CGWindowListCopyWindowInfo, kCGNullWindowID,
                             kCGWindowListOptionOnScreenOnly)
 
-        window_id = None
+        mine = os.getpid()
+        candidates = []
         for info in CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly,
                                                kCGNullWindowID) or []:
-            if str(info.get("kCGWindowName") or "") == title:
-                window_id = info.get("kCGWindowNumber")
-                break
-        if window_id is None:
+            bounds = info.get("kCGWindowBounds") or {}
+            width, height = int(bounds.get("Width", 0)), int(bounds.get("Height", 0))
+            if width < 200 or height < 200:
+                continue                 # menu bar items, tooltips, shadows
+            named = str(info.get("kCGWindowName") or "")
+            if info.get("kCGWindowOwnerPID") == mine or (named and named == title):
+                candidates.append((width * height, info.get("kCGWindowNumber")))
+        if not candidates:
             return None
 
+        window_id = max(candidates)[1]   # the largest window we own
         with tempfile.TemporaryDirectory() as tmp:
             shot = Path(tmp) / "window.png"
             # -o drops the window shadow, -x silences the shutter sound.
@@ -99,10 +132,11 @@ def _mac_window(title: str):
             image = Image.open(shot)
             image.load()
 
-        # A denied Screen Recording permission yields a tiny or empty image.
         if image.width < 50 or image.height < 50:
             return None
         return image
+    except ScreenPermissionNeeded:
+        raise
     except Exception:
         return None
 

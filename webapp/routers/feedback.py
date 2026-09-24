@@ -24,6 +24,11 @@ NO_STORE = {"Cache-Control": "no-store, max-age=0", "Referrer-Policy": "no-refer
 MAX_IMAGE_BYTES = 12 * 1024 * 1024
 MAX_COMMENT = 4000
 
+# A full-screen Retina capture, base64'd, runs to tens of megabytes. This is a
+# local app talking to itself, so the number only needs to be bigger than a
+# screenshot can plausibly be.
+MAX_IMAGE_BYTES = 64 * 1024 * 1024
+
 # The capture waiting to be annotated. One at a time, in memory, never on disk until
 # the user saves it — a screenshot of this app is client data.
 _pending: dict[str, bytes] = {}
@@ -34,6 +39,14 @@ async def feedback_capture(request: Request):
     """Grab the window as it looks right now, before navigating away from it."""
     try:
         _pending["png"] = feedback_engine.capture()
+    except feedback_engine.ScreenPermissionNeeded:
+        # Better to say this than to attach a picture of the desktop and let
+        # someone believe they sent a picture of the app.
+        raise HTTPException(
+            status_code=503,
+            detail="macOS needs permission before this app can photograph its own "
+                   "window. Allow it under System Settings > Privacy & Security > "
+                   "Screen Recording, then quit and reopen the app and try again.")
     except Exception as exc:
         raise HTTPException(status_code=503,
                             detail=f"Could not take a screenshot: {exc}")
@@ -64,7 +77,11 @@ async def feedback_image():
 @router.post("/feedback/send", response_class=HTMLResponse, name="feedback_send")
 async def feedback_send(request: Request):
     """Save the marked-up picture, then open the mail client with the comment in it."""
-    data = parse_nested((await request.form()).multi_items())
+    # A screenshot arrives as one base64 field, and Starlette caps a field at 1 MB
+    # by default — so every real capture was rejected before this function ran.
+    # Raised only here; every other form in the app keeps the default.
+    async with request.form(max_part_size=MAX_IMAGE_BYTES) as form:
+        data = parse_nested(form.multi_items())
     comment = str(data.get("comment") or "").strip()[:MAX_COMMENT]
     if not comment:
         raise HTTPException(status_code=400, detail="Write a comment first.")
