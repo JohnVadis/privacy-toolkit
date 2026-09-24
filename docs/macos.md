@@ -117,8 +117,23 @@ uses the first it finds.
 **Screen Recording** — only for the **Comment** button, which takes a picture of the
 app window so you can point at what's wrong. macOS asks the first time you use it:
 System Settings → Privacy & Security → Screen Recording → allow the Terminal (or
-`Privacy Toolkit`, if you're running a packaged build). Until it's granted the
-capture is refused outright rather than attaching a blank or wrong image to an email.
+`Privacy Toolkit`, if you're running a packaged build).
+
+**Then quit the app and start it again.** macOS does not extend a newly granted
+Screen Recording permission to a process that is already running, so Comment keeps
+refusing until the app is restarted. This is the step everyone misses.
+
+Until it is granted the capture is refused outright — `ScreenPermissionNeeded`, which
+the route turns into a 503 naming the setting. That refusal is deliberate and worth
+keeping: without permission `screencapture` still returns an image of the right
+*size* showing the desktop, so the feature looks like it worked and quietly attaches
+a photo of whatever else the worker had open to an email. A beta tester hit exactly
+that.
+
+The window itself is found by **owner PID**, not by title. macOS reveals window
+titles only to a process that already holds this permission, so a title lookup fails
+on precisely the machines where it matters, and fails silently by grabbing the whole
+screen. The webview runs in our own process, so the PID always matches.
 
 Everything else — filling forms, importing documents, building worklists, exporting —
 needs no permission at all.

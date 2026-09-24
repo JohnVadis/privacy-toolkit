@@ -159,8 +159,16 @@ display name, because two clients can share a display name and then share a fold
   shown in a dialog (MessageBoxW / osascript) because a launched app has no console.
 - macOS notes: a frozen build is a `.app`, so `paths._root()` walks OUT of the bundle —
   user data beside it, never inside, where a reinstall would erase it. Window capture
-  uses Quartz + `screencapture -l`, which needs Screen Recording permission the first
-  time; pyobjc comes with pywebview on macOS, so there is nothing extra to install.
+  uses Quartz + `screencapture -l` and finds the window by OWNER PID, never by title —
+  macOS reveals titles only to a process that already holds Screen Recording, so a
+  title lookup fails on exactly the machines that need it and fails silently, by
+  photographing the whole desktop. Permission is preflighted and refused loudly
+  (`ScreenPermissionNeeded` -> 503), because without it `screencapture` returns a
+  correctly sized picture of the desktop and the feature looks like it worked.
+  pyobjc ships with pywebview, but it is imported inside a function, so the frozen
+  build must list `Quartz`/`AppKit`/`Foundation`/`objc` in `build_exe.HIDDEN` — that
+  omission is what shipped the desktop-photo bug. macOS applies a newly granted
+  permission only to a process started afterwards, so the app must be restarted.
 - `generation_log.py` — one JSONL line per filled form, in
   `output/<client>/.generation-log.jsonl`: what was produced, from which mapping and
   blank PDF (by SHA-256), with the library versions that drew it. `verify()` answers
