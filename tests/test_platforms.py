@@ -32,8 +32,11 @@ class TestFrozenRoot:
         return paths._root().as_posix()
 
     def test_windows_data_sits_beside_the_exe(self, monkeypatch):
+        # Forward slashes deliberately: a backslash is not a separator on Linux, so
+        # the backslash form is one filename there and the test passed only on
+        # Windows. Path() accepts this on every platform.
         root = self._root_for(monkeypatch, "win32",
-                              r"C:\Apps\Privacy Toolkit\Privacy Toolkit.exe")
+                              "C:/Apps/Privacy Toolkit/Privacy Toolkit.exe")
         assert root.endswith("Privacy Toolkit")
 
     def test_macos_data_sits_beside_the_app_not_inside_it(self, monkeypatch):

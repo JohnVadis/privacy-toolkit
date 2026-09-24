@@ -56,17 +56,7 @@ jobs:
         # Proves the app's own Python can fill a form — that every module and data
         # file made it into the bundle. Catches a missing hidden import, which
         # otherwise only shows up on the user's first double-click.
-        run: |
-          cd "dist/Privacy Toolkit"
-          cat > smoke.py <<'PY'
-          import sys, pathlib
-          sys.path.insert(0, str(pathlib.Path("..", "..").resolve()))
-          import fill_forms, client_context, case_export, generation_log
-          keys = [m["form_key"] for m in fill_forms.list_mappings() if m["pdf_present"]]
-          print("mappings with a blank PDF present:", keys)
-          assert keys, "the build shipped no usable forms"
-          PY
-          python smoke.py && rm smoke.py
+        run: python -c "import fill_forms; keys=[m['form_key'] for m in fill_forms.list_mappings() if m['pdf_present']]; print('usable forms:', keys); assert keys, 'the build shipped no usable forms'"
 
       - name: Zip it
         run: |

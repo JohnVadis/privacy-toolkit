@@ -36,7 +36,13 @@ class TestShippedMappings:
     @pytest.mark.parametrize("path", mapping_paths(), ids=form_key_for)
     def test_checks_clean(self, path):
         text = path.read_text(encoding="utf-8")
-        assert problems(text, form_key_for(path)) == []
+        found = problems(text, form_key_for(path))
+
+        # "No blank PDF at ..." is about the machine, not the mapping: some blank
+        # forms are gitignored, so a fresh clone (and CI) legitimately lacks them.
+        # Whether the file is THERE is the next test's job; this one is structure.
+        found = [p for p in found if not p.startswith("No blank PDF at ")]
+        assert found == []
 
     @pytest.mark.parametrize("path", mapping_paths(), ids=form_key_for)
     def test_declares_a_blank_pdf_that_exists(self, path):
