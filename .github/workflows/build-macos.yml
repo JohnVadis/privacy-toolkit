@@ -16,6 +16,8 @@ on:
 jobs:
   build:
     runs-on: macos-latest
+    permissions:
+      contents: write        # to attach the build to a release
 
     steps:
       - uses: actions/checkout@v4
@@ -65,9 +67,15 @@ jobs:
           zip -qry "Privacy Toolkit (macOS).zip" "Privacy Toolkit"
           ls -lh "Privacy Toolkit (macOS).zip"
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Privacy-Toolkit-macOS
-          path: dist/Privacy Toolkit (macOS).zip
-          retention-days: 30
-          if-no-files-found: error
+      - name: Publish it as a release
+        # A release asset rather than a build artifact: artifacts are capped by a
+        # per-account storage quota that a few macOS builds will exhaust, and the
+        # failure lands on the very last step after a working app has been built.
+        # The tag is fixed and the asset is clobbered, so this is always "the
+        # current Mac build" rather than an accumulating pile.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view macos-build >/dev/null 2>&1             || gh release create macos-build                  --title "Privacy Toolkit — macOS build"                  --notes "Built automatically from master. Download the zip below, unzip, and drag Privacy Toolkit.app wherever you want it. Nothing to install."
+          gh release upload macos-build "dist/Privacy Toolkit (macOS).zip" --clobber
+          echo "Download: $(gh release view macos-build --json url -q .url)"
