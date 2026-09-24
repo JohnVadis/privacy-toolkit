@@ -1,14 +1,42 @@
 # Running it on a Mac
 
-The toolkit runs the same on macOS as on Windows — same engine, same forms, same
-files. Only the launcher and a couple of OS permissions differ.
+Two ways. The first needs nothing installed and is what you want.
 
-**Nothing here has been run on a Mac yet.** The platform-specific code is covered by
-`tests/test_platforms.py` with the platform patched, but a first real run is a first
-real run. The last section says exactly what to check and what to do when something
-doesn't work.
+## 1. The ready-built app (nothing to install)
 
-## Getting it there
+A macOS runner builds `Privacy Toolkit.app` from this repo and attaches it to a
+release. Nothing on the Mac: no Python, no Terminal, no launcher.
+
+**Download:** <https://github.com/JohnVadis/privacy-toolkit/releases/tag/macos-build>
+
+Take `Privacy Toolkit (macOS).zip`, unzip it, and put the `Privacy Toolkit` folder
+wherever you keep work. Inside is `Privacy Toolkit.app` plus the files it reads and
+writes — `clients/`, `output/`, `forms/`, `sites.yaml`. Double-click the app.
+
+Keep the app and those folders together: the app writes client files **beside**
+itself, so moving only the .app leaves the cases behind.
+
+The first launch, macOS will say it *"cannot be opened because Apple cannot check it
+for malicious software"* — it's unsigned, and buying a certificate is a separate
+decision. **Right-click the app → Open → Open.** Once only.
+
+### Rebuilding it
+
+After any change to the toolkit, push to `master`, then Actions →
+**build macOS app** → *Run workflow*. It runs the full test suite first and refuses
+to publish an app whose engine is broken. The release is replaced in place, so the
+download link never changes.
+
+```bash
+gh workflow run build-macos.yml --ref master     # from a terminal, if you prefer
+```
+
+## 2. From source, with the launcher
+
+Needs Python on the Mac. Use this if you're changing the code and want to see
+changes without waiting for a build.
+
+### Getting it there
 
 Copy `Privacy Toolkit (test copy).zip` to the Mac however you like — USB, AirDrop,
 email, a shared folder. Unzip it by double-clicking. You'll get a folder called
@@ -18,7 +46,7 @@ fine, the Desktop is fine).
 Don't run it from inside the Downloads folder long-term — client files get written
 next to the app, and Downloads is the folder people empty without looking.
 
-## First run
+### First run
 
 Double-click **`Start Privacy Toolkit.command`**.
 
@@ -50,7 +78,7 @@ A Terminal window opens and the launcher:
 **Leave the Terminal window open while you work.** Closing it closes the app. That's
 the same as the black window on Windows.
 
-## If it says Python isn't installed
+### If it says Python isn't installed
 
 macOS doesn't ship a Python you can rely on. Install one:
 
@@ -64,7 +92,7 @@ Then double-click the launcher again.
 The launcher looks for `python3.12`, then `python3.11`, then plain `python3`, and
 uses the first it finds.
 
-## The two permissions macOS will ask for
+### The two permissions macOS will ask for
 
 **Screen Recording** — only for the **Comment** button, which takes a picture of the
 app window so you can point at what's wrong. macOS asks the first time you use it:
@@ -79,7 +107,7 @@ needs no permission at all.
 ask the app for access the first time it writes there. Allow it, or move the folder
 somewhere outside those two.
 
-## Where your client data lives
+### Where your client data lives
 
 Exactly where it does on Windows: `clients/` and `output/` **inside the toolkit
 folder**, next to the launcher. Nothing is written to `~/Library`, nothing syncs, and
@@ -89,7 +117,7 @@ If you later build the packaged `.app` (`python build_exe.py` on the Mac), the d
 sits in the folder *containing* the `.app`, never inside the bundle — so replacing the
 app with a newer one never touches the cases.
 
-## What to check on the first run
+### What to check on the first run
 
 In rough order of "most likely to be wrong":
 
@@ -104,7 +132,7 @@ In rough order of "most likely to be wrong":
 
 That last one is the macOS-specific code most worth eyeballing.
 
-## When something breaks
+### When something breaks
 
 The most likely failure by far is **a library that won't install**. The versions in
 `requirements.txt` are pinned exactly, on purpose — reportlab decides where text lands

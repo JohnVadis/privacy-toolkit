@@ -69,7 +69,7 @@ Windows and macOS both. The difference is only the launcher:
 | | |
 |---|---|
 | Windows | double-click **Start Privacy Toolkit.bat** |
-| macOS | double-click **Start Privacy Toolkit.command** |
+| macOS | download the [ready-built app](https://github.com/JohnVadis/privacy-toolkit/releases/tag/macos-build) — nothing to install — or double-click **Start Privacy Toolkit.command** to run from source |
 
 Either one builds a private Python environment on first run (needs internet once,
 about a minute) and then opens the app. On macOS, if Finder refuses to run the

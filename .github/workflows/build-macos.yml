@@ -54,11 +54,18 @@ jobs:
           du -sh "$APP"
           ls "dist/Privacy Toolkit"
 
-      - name: Smoke-test the bundled engine
-        # Proves the app's own Python can fill a form — that every module and data
-        # file made it into the bundle. Catches a missing hidden import, which
-        # otherwise only shows up on the user's first double-click.
-        run: python -c "import fill_forms; keys=[m['form_key'] for m in fill_forms.list_mappings() if m['pdf_present']]; print('usable forms:', keys); assert keys, 'the build shipped no usable forms'"
+      - name: Check the shipped folder is complete
+        # Inspects what was BUILT, not the checkout it was built from. A bundle
+        # missing its beside-the-app files launches and then cannot fill anything,
+        # which is a miserable thing to discover on someone else's Mac.
+        run: |
+          cd "dist/Privacy Toolkit"
+          for required in               "sites.yaml"               "clients/_TEMPLATE.yaml"               "forms/mappings/hillsborough_clerk_redaction.map.yaml"               "forms/_blank_pdfs/Hillsborough_Redaction.pdf"               "READ ME FIRST.txt"; do
+            test -f "$required" || { echo "missing from the build: $required"; exit 1; }
+          done
+          echo "beside the app:"
+          ls
+          echo "forms shipped: $(ls forms/mappings | wc -l) mapping(s), $(ls forms/_blank_pdfs | wc -l) blank PDF(s)"
 
       - name: Zip it
         run: |
