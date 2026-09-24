@@ -78,6 +78,47 @@ class TestCrossSiteCheck:
         response = raw_client.get("/", headers={"Origin": "http://127.0.0.1:8765"})
         assert response.status_code == 200
 
+    def test_an_opaque_origin_is_not_treated_as_a_foreign_one(self, raw_client):
+        """The bug that locked a Mac tester out of the Comment screen.
+
+        WKWebView sends no Sec-Fetch-Site, so it lands in this fallback, and it
+        sends `Origin: null` in cases Chromium does not. Reading "null" as a
+        foreign site turned the app's own window into an attacker and answered
+        "Forbidden - this request came from another site".
+
+        Letting it through is safe because the token still has to be right: the
+        cookie is HttpOnly and SameSite=Strict, so a genuinely cross-site caller
+        never carries one. The next test is the other half of that claim.
+        """
+        raw_client.cookies.set(TOKEN_COOKIE, SESSION_TOKEN)
+        response = raw_client.post("/feedback/send", data={"comment": "hi"},
+                                   headers={"Origin": "null"})
+        assert response.status_code == 200
+
+    def test_an_opaque_origin_without_the_token_is_still_refused(self, raw_client):
+        # The half that keeps the above honest. A sandboxed page on someone else's
+        # site can POST with Origin: null, but SameSite=Strict means it arrives
+        # with no cookie, so the token check - not the origin check - stops it.
+        response = raw_client.post("/clients/new", data={},
+                                   headers={"Origin": "null"})
+        assert response.status_code == 403
+
+    def test_a_named_foreign_origin_is_still_refused(self, raw_client):
+        # Widening "null" must not widen anything else.
+        raw_client.cookies.set(TOKEN_COOKIE, SESSION_TOKEN)
+        for origin in ("https://evil.example", "http://127.0.0.1.evil.example",
+                       "http://localhost.evil.example"):
+            response = raw_client.post("/clients/new", data={},
+                                       headers={"Origin": origin})
+            assert response.status_code == 403, origin
+
+    def test_a_refusal_quotes_the_value_that_caused_it(self, raw_client):
+        # "Forbidden." on its own cost a round trip with a tester who could only
+        # report the word. The offending value is what makes the report actionable.
+        raw_client.cookies.set(TOKEN_COOKIE, SESSION_TOKEN)
+        body = raw_client.get("/", headers={"Origin": "https://evil.example"}).text
+        assert "evil.example" in body
+
 
 class TestTokenCheck:
     """Stops any other local process, which loopback alone does not."""

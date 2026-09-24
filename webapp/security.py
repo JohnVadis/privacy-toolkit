@@ -14,8 +14,11 @@ Three checks, cheapest first:
   2. Cross-site  — `Sec-Fetch-Site` must be same-origin or none (a typed URL or a
                    click from outside the web). cross-site and same-site are refused,
                    which is what stops a malicious page's form POST. Clients that send
-                   no Sec-Fetch-Site (curl, scripts) fall back to an Origin check and
-                   are still gated by the token below.
+                   no Sec-Fetch-Site (curl, scripts, and macOS WKWebView — so the
+                   app's own window on a Mac) fall back to an Origin check and are
+                   still gated by the token below. That fallback judges only a NAMED
+                   foreign origin: `Origin: null` means "cannot tell", not "hostile",
+                   and refusing it locked a Mac tester out of their own app.
   3. Token       — a secret minted per process. The desktop window (or the URL printed
                    at startup) carries it once as ?k=…; that sets an HttpOnly,
                    SameSite=Strict cookie and redirects to a clean URL. Another local
@@ -58,18 +61,18 @@ class LocalOnlyMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request, call_next):
         # --- 1. Host -------------------------------------------------------
-        if _hostname(request.headers.get("host", "")) not in ALLOWED_HOSTNAMES:
-            return _refused("this request named a different host")
+        host_header = request.headers.get("host", "")
+        if _hostname(host_header) not in ALLOWED_HOSTNAMES:
+            return _refused(f"this request named a different host (Host: {host_header})")
 
         # --- 2. cross-site --------------------------------------------------
         fetch_site = request.headers.get("sec-fetch-site")
         if fetch_site is not None:
             if fetch_site not in ("same-origin", "none") and not _entry_navigation(request):
                 return _refused(f"this request came from {fetch_site}")
-        else:
+        elif not _origin_ok(request):
             origin = request.headers.get("origin")
-            if origin and _hostname(origin.split("//", 1)[-1]) not in ALLOWED_HOSTNAMES:
-                return _refused("this request came from another site")
+            return _refused(f"this request came from another site (Origin: {origin})")
 
         # --- 3. token -------------------------------------------------------
         if request.url.path not in TOKEN_EXEMPT_PATHS:
@@ -104,6 +107,38 @@ def _refused(because: str) -> PlainTextResponse:
         "This app only answers its own window. If you are seeing this in normal use "
         "it is a bug worth reporting, along with this line.",
         status_code=403)
+
+
+def _origin_ok(request) -> bool:
+    """The fallback when a client sends no Sec-Fetch-Site. True unless Origin names
+    somewhere else.
+
+    Reached only by clients that don't implement Fetch Metadata — which includes
+    macOS WKWebView, i.e. the app's own window on a Mac. Chromium always sends
+    Sec-Fetch-Site, so this branch never runs on Windows. That asymmetry is why a
+    bug here reached a beta tester as a bare "Forbidden" on the Comment screen.
+
+    Two things this must get right:
+
+    * `Origin: null` is an OPAQUE origin — the absence of origin information, not
+      the presence of a foreign one. WebKit sends it in cases Chromium does not.
+      Refusing it turned "I cannot tell where this came from" into "this is an
+      attack", and blocked the app's own window. The honest answer to no
+      information is to let the token below decide, which is safe: the token
+      cookie is HttpOnly and SameSite=Strict, so it is not sent on a cross-site
+      request AT ALL. A sandboxed page POSTing with Origin: null arrives with no
+      cookie and is refused at check 3. The token is the real gate; this check is
+      defence in depth and must not fire on a non-signal.
+
+    * Same-origin is measured against the Host this request was actually sent to,
+      not only the fixed allowlist, so any spelling of loopback the window really
+      used counts as itself.
+    """
+    origin = (request.headers.get("origin") or "").strip()
+    if not origin or origin.lower() == "null":
+        return True                      # nothing to judge; the token decides
+    host = _hostname(origin.split("//", 1)[-1])
+    return host in ALLOWED_HOSTNAMES or host == _hostname(request.headers.get("host", ""))
 
 
 def _entry_navigation(request) -> bool:
