@@ -9,8 +9,8 @@ from paths import (OUTPUT_DIR, client_output_dir, contains, resolve,
 
 class TestSlugify:
     @pytest.mark.parametrize("value,expected", [
-        ("Marlowe, Priya", "marlowe_priya"),
-        ("MARLOWE  PRIYA", "marlowe_priya"),
+        ("Fabian, Noor", "fabian_noor"),
+        ("FABIAN  NOOR", "fabian_noor"),
         ("Ann-Marie O'Brien", "ann_marie_o_brien"),
         ("", "client"),
         (None, "client"),
@@ -35,7 +35,7 @@ class TestSafeDirName:
             "con", "prn", "aux", "nul", "com1", "lpt9"}
 
     def test_keeps_a_readable_name_as_it_is(self):
-        assert safe_dir_name("Priya B") == "Priya B"
+        assert safe_dir_name("Noor F") == "Noor F"
         assert safe_dir_name("Smith John (2)") == "smith_john_2"   # falls back to slug
 
     def test_strips_trailing_dot_and_space_windows_rejects_both(self):
