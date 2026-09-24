@@ -43,6 +43,18 @@ BUNDLE_ID = "com.qvadis.privacytoolkit"
 # .app bundle, and the .app is the thing to ship.
 APP_FILE = f"{APP_NAME}.app" if MACOS else f"{APP_NAME}.exe"
 
+
+def make_test_copy_body() -> str:
+    """The platform-independent half of the READ ME, shared with the source copy.
+
+    Everything from "WHAT IT DOES" down is the same wherever it runs, so it is kept
+    in one place rather than drifting between three copies.
+    """
+    import make_test_copy
+
+    text = make_test_copy.READ_ME
+    return "\n" + text[text.index("WHAT IT DOES"):]
+
 # Shipped inside the executable: read-only, never edited by the user.
 BUNDLED_DATA = [
     ("webapp/templates", "webapp/templates"),
@@ -146,31 +158,91 @@ def add_user_files(app_dir: Path) -> None:
         + dump_client(dict(EXAMPLE_CLIENT)), encoding="utf-8")
     (app_dir / "output").mkdir(exist_ok=True)
 
-    import make_test_copy
-
     (app_dir / "READ ME FIRST.txt").write_text(
-        make_test_copy.READ_ME.replace(
-            'Double-click "Start Privacy Toolkit.bat".',
-            'Double-click "Privacy Toolkit.exe".')
-        .replace(
-            """The first time, it sets itself up: it builds what it needs and downloads a few
-parts, which takes about a minute and needs an internet connection. It then puts
-a "Privacy Toolkit" icon on your Desktop and opens the app.
+        READ_ME_MACOS if MACOS else READ_ME_WINDOWS, encoding="utf-8")
 
-After that, just use the Desktop icon. It opens in about two seconds and there is
-no black window. Come back to the .bat file only if something breaks — it repairs
-the installation and shows you what went wrong.
 
-If it tells you Python isn't installed: get it from python.org/downloads, and on
-the first screen of the installer tick "Add python.exe to PATH".""",
-            """Nothing to install. No internet needed. It opens in a few seconds.
+def tidy_macos_bundle(app_dir: Path) -> None:
+    """Leave the .app and the files it uses — nothing else.
+
+    PyInstaller writes BOTH a .app and a plain onedir build, and the onedir copy is
+    a complete second copy of the runtime: it doubles the download, and it leaves a
+    `Privacy Toolkit` unix executable sitting next to `Privacy Toolkit.app` that
+    looks just as launchable and opens a Terminal window if clicked. A beta tester
+    should see one thing to double-click.
+    """
+    for junk in (app_dir / "_internal", app_dir / APP_NAME):
+        if junk.is_dir():
+            shutil.rmtree(junk)
+        elif junk.exists():
+            junk.unlink()
+
+
+def sign_macos_bundle(app_dir: Path) -> None:
+    """Ad-hoc sign the bundle so macOS will run it at all.
+
+    Apple Silicon refuses to launch an unsigned arm64 binary outright — the user
+    gets "the application is damaged", which sounds like a corrupt download and
+    isn't. An ad-hoc signature costs nothing and no certificate. It does NOT
+    silence the unidentified-developer warning; that needs a paid Developer ID.
+    """
+    app = app_dir / APP_FILE
+    try:
+        subprocess.run(["codesign", "--force", "--deep", "--sign", "-", str(app)],
+                       check=True, capture_output=True)
+        print("  ad-hoc signed the bundle")
+    except (OSError, subprocess.CalledProcessError) as exc:
+        detail = getattr(exc, "stderr", b"") or b""
+        print(f"  note: could not ad-hoc sign ({detail.decode(errors='replace').strip()})")
+
+
+READ_ME_WINDOWS = """PRIVACY REMOVAL TOOLKIT
+=======================
+
+TO START
+--------
+Double-click "Privacy Toolkit.exe".
+
+Nothing to install. No internet needed. It opens in a few seconds.
 
 Windows may say "Windows protected your PC" the first time, because this app
 hasn't been bought a code-signing certificate. Click "More info", then
 "Run anyway". It only has to be done once.
 
 If you want it handy, right-click the .exe and choose "Pin to Start" or send a
-shortcut to your Desktop."""), encoding="utf-8")
+shortcut to your Desktop.
+""" + make_test_copy_body()
+
+READ_ME_MACOS = """PRIVACY REMOVAL TOOLKIT
+=======================
+
+TO START
+--------
+Double-click "Privacy Toolkit.app".
+
+Nothing to install — no Python, no Terminal, no setup. It opens in a few seconds.
+
+THE FIRST TIME, macOS WILL REFUSE TO OPEN IT.
+You will see something like "Apple could not verify Privacy Toolkit is free of
+malware". That is macOS objecting to any app that hasn't been bought an Apple
+developer certificate — it is not a warning about this app specifically.
+
+  Right-click (or Control-click) "Privacy Toolkit.app"  ->  Open  ->  Open
+
+You only do that once. After that it opens normally by double-clicking.
+
+If macOS instead says the app is "damaged and can't be opened", the download
+picked up a quarantine flag. Open Terminal, type the following with a trailing
+space, drag this folder onto the window, and press Return:
+
+  xattr -cr 
+
+KEEP THIS FOLDER TOGETHER
+-------------------------
+The app writes your client files into the folders beside it — "clients" and
+"output". Move the whole folder, not just the app, or you will leave the cases
+behind. Put it anywhere you like: Documents, Desktop, an external drive.
+""" + make_test_copy_body()
 
 
 def main():
@@ -194,6 +266,10 @@ def main():
         if target.exists():
             shutil.rmtree(target)
         shutil.move(str(produced), str(target))
+        # Only after the .app is in place: the onedir copy beside it is redundant,
+        # and an unsigned arm64 bundle will not launch at all.
+        tidy_macos_bundle(app_dir)
+        sign_macos_bundle(app_dir)
     add_user_files(app_dir)
 
     total = sum(f.stat().st_size for f in app_dir.rglob("*") if f.is_file())

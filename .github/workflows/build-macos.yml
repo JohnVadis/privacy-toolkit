@@ -15,7 +15,20 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    # Two Macs, because a build runs only on the chip it was made for. macos-latest
+    # is Apple Silicon; an Intel Mac would download it and get nothing that runs.
+    # The tester picks by the name of the file.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            label: Apple Silicon (M1, M2, M3, M4)
+            suffix: apple-silicon
+          - runner: macos-13
+            label: Intel
+            suffix: intel
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: write        # to attach the build to a release
 
@@ -63,6 +76,11 @@ jobs:
           for required in               "sites.yaml"               "clients/_TEMPLATE.yaml"               "forms/mappings/hillsborough_clerk_redaction.map.yaml"               "forms/_blank_pdfs/Hillsborough_Redaction.pdf"               "READ ME FIRST.txt"; do
             test -f "$required" || { echo "missing from the build: $required"; exit 1; }
           done
+          # The onedir duplicate must not be here: it doubles the download and
+          # puts a second launchable-looking thing next to the real app.
+          test ! -e "_internal" || { echo "_internal was left in the build"; exit 1; }
+          test ! -e "Privacy Toolkit" || {
+            echo "the raw executable was left beside the .app"; exit 1; }
           echo "beside the app:"
           ls
           echo "forms shipped: $(ls forms/mappings | wc -l) mapping(s), $(ls forms/_blank_pdfs | wc -l) blank PDF(s)"
@@ -70,9 +88,10 @@ jobs:
       - name: Zip it
         run: |
           cd dist
-          # -y keeps symlinks inside the bundle, which macOS frameworks rely on.
-          zip -qry "Privacy Toolkit (macOS).zip" "Privacy Toolkit"
-          ls -lh "Privacy Toolkit (macOS).zip"
+          # -y keeps symlinks inside the bundle, which macOS frameworks rely on;
+          # flattening them breaks the frameworks and the app will not launch.
+          zip -qry "Privacy Toolkit for ${{ matrix.suffix }} Macs.zip" "Privacy Toolkit"
+          ls -lh *.zip
 
       - name: Publish it as a release
         # A release asset rather than a build artifact: artifacts are capped by a
@@ -83,6 +102,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view macos-build >/dev/null 2>&1             || gh release create macos-build                  --title "Privacy Toolkit — macOS build"                  --notes "Built automatically from master. Download the zip below, unzip, and drag Privacy Toolkit.app wherever you want it. Nothing to install."
-          gh release upload macos-build "dist/Privacy Toolkit (macOS).zip" --clobber
+          gh release view macos-build >/dev/null 2>&1             || gh release create macos-build                  --title "Privacy Toolkit — macOS build"                  --notes "$(cat .github/release-notes.md)"
+          gh release upload macos-build             "dist/Privacy Toolkit for ${{ matrix.suffix }} Macs.zip" --clobber
           echo "Download: $(gh release view macos-build --json url -q .url)"
