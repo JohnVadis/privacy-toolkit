@@ -28,7 +28,11 @@ REPO = Path(__file__).resolve().parent.parent
 # Redirect ROOT before anything imports paths.py. Import order matters here, so
 # this runs at module scope rather than in a fixture.
 # ---------------------------------------------------------------------------
-_SANDBOX = Path(tempfile.mkdtemp(prefix="privacy-toolkit-tests-"))
+# .resolve() to match what paths._root() does with the env var. On macOS /var is a
+# symlink to /private/var, so mkdtemp() hands back /var/... while _root() resolves to
+# /private/var/... — the same directory, unequal paths, and the guard below fired on
+# every macOS run.
+_SANDBOX = Path(tempfile.mkdtemp(prefix="privacy-toolkit-tests-")).resolve()
 os.environ["PRIVACY_TOOLKIT_HOME"] = str(_SANDBOX)
 
 for name in ("forms",):
