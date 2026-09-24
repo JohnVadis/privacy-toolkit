@@ -204,6 +204,8 @@ zero. When adding a county or form, you're writing one mapping file, not code.
 - `docs/webapp.md` — web UI routes, the reuse boundary, and how the rules are enforced.
 - `docs/adding-forms.md` — how to map a new county form (incl. finding checkbox coords).
 - `docs/forms-reference.md` — field-by-field detail of the four wired forms.
+- `docs/macos.md` — running it on a Mac: Gatekeeper, Python, the two permissions,
+  and what to check on a first run (nothing has been run on a Mac yet).
 - `docs/testing.md` — what the suite covers, and how it stays off real client data.
 - `docs/verification-checklist.md` — run this the first time any form is used for real.
 - `docs/decisions.md` — why it's built this way (buy-vs-build, overlay, human gates).
