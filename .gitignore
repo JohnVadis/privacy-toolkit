@@ -4,8 +4,15 @@
 clients/*
 !clients/_TEMPLATE.yaml
 output/
+# Blank county forms are public documents, not client data, and a build machine
+# cannot produce a working app without them. The four real ones are tracked; any
+# other PDF dropped in here (a scratch form, a client's own paperwork) is not.
 forms/_blank_pdfs/*.pdf
 !forms/_blank_pdfs/demo_redaction.pdf
+!forms/_blank_pdfs/Hillsborough_Redaction.pdf
+!forms/_blank_pdfs/Hillsborough_Military_Confidentiality_Form_Refined2.pdf
+!forms/_blank_pdfs/Hillsborough_Property_Appraisers_Exemption.pdf
+!forms/_blank_pdfs/address-confidentiality-exemption-form-07-2025.pdf
 __pycache__/
 *.pyc
 .venv/

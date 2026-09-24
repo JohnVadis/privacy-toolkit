@@ -1,0 +1,83 @@
+name: build macOS app
+
+# Builds "Privacy Toolkit.app" on a real Mac and leaves it as a downloadable
+# artifact. PyInstaller cannot cross-compile, so this is how a Mac build gets made
+# without owning a Mac to build it on — and what the recipient downloads needs
+# nothing installed: no Python, no launcher, no Terminal.
+#
+# Run it from the Actions tab: "build macOS app" -> Run workflow.
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # 3.12 has ready-built packages for everything pinned here, which is the
+          # thing most likely to fail on a version chosen for other reasons.
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Run the tests first
+        # No point shipping an app whose engine is broken. The golden test skips
+        # here only if the blank PDFs are missing; they are tracked, so it runs.
+        run: |
+          pip install -r requirements-dev.txt
+          pytest -q
+
+      - name: Build the app
+        run: python build_exe.py
+
+      - name: Check what came out
+        run: |
+          APP="dist/Privacy Toolkit/Privacy Toolkit.app"
+          test -d "$APP" || { echo "no .app was produced"; exit 1; }
+          test -x "$APP/Contents/MacOS/Privacy Toolkit" || {
+            echo "the bundle has no runnable executable"; exit 1; }
+          echo "Built:"
+          du -sh "$APP"
+          ls "dist/Privacy Toolkit"
+
+      - name: Smoke-test the bundled engine
+        # Proves the app's own Python can fill a form — that every module and data
+        # file made it into the bundle. Catches a missing hidden import, which
+        # otherwise only shows up on the user's first double-click.
+        run: |
+          cd "dist/Privacy Toolkit"
+          cat > smoke.py <<'PY'
+          import sys, pathlib
+          sys.path.insert(0, str(pathlib.Path("..", "..").resolve()))
+          import fill_forms, client_context, case_export, generation_log
+          keys = [m["form_key"] for m in fill_forms.list_mappings() if m["pdf_present"]]
+          print("mappings with a blank PDF present:", keys)
+          assert keys, "the build shipped no usable forms"
+          PY
+          python smoke.py && rm smoke.py
+
+      - name: Zip it
+        run: |
+          cd dist
+          # -y keeps symlinks inside the bundle, which macOS frameworks rely on.
+          zip -qry "Privacy Toolkit (macOS).zip" "Privacy Toolkit"
+          ls -lh "Privacy Toolkit (macOS).zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Privacy-Toolkit-macOS
+          path: dist/Privacy Toolkit (macOS).zip
+          retention-days: 30
+          if-no-files-found: error
