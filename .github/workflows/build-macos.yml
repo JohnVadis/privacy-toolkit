@@ -25,10 +25,17 @@ jobs:
           - runner: macos-latest
             label: Apple Silicon (M1, M2, M3, M4)
             suffix: apple-silicon
-          - runner: macos-13
+          # macos-15-intel, NOT macos-13: the macos-13 runners were retired and a
+          # job asking for one simply queues forever. The first Intel build sat
+          # unstarted for over two hours while the Apple Silicon one finished in
+          # 77 seconds, which looked like a broken build and was a dead label.
+          - runner: macos-15-intel
             label: Intel
             suffix: intel
     runs-on: ${{ matrix.runner }}
+    # An Intel runner that is busy, retired or renamed must not hold up the build
+    # most testers actually need. Each chip publishes on its own.
+    continue-on-error: ${{ matrix.suffix == 'intel' }}
     permissions:
       contents: write        # to attach the build to a release
 
