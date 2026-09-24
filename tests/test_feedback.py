@@ -11,6 +11,7 @@ runs.
 from __future__ import annotations
 
 import base64
+import os
 import re
 from urllib.parse import parse_qs, urlparse
 
@@ -215,6 +216,27 @@ class TestSendRoute:
         app_client.post("/feedback/send", data={"comment": "x" * 50_000})
         body = parse_qs(urlparse(no_desktop["opened"][0]).query)["body"][0]
         assert len(body) <= router.MAX_COMMENT + 200
+
+    def test_a_real_screenshot_is_not_too_big_to_send(self, app_client, no_desktop):
+        """The bug a beta tester hit: press Send, get "Forbidden".
+
+        Starlette caps a single form field at 1 MB by default, and a screenshot of
+        a window on a Retina display is several. The upload was rejected before any
+        handler ran, so nothing here was reached and nothing was saved — the user
+        wrote their note and lost it. Anything that lowers MAX_IMAGE_BYTES back
+        under a realistic capture should fail this.
+        """
+        # Incompressible, so the encoded size is honest rather than a PNG of flat
+        # colour that shrinks to nothing and proves nothing.
+        blob = base64.b64encode(os.urandom(3 * 1024 * 1024)).decode()
+        assert len(blob) > 1024 * 1024          # bigger than the old cap
+
+        response = app_client.post("/feedback/send", data={
+            "comment": "the document table printed on the wrong page",
+            "image": f"data:image/png;base64,{blob}",
+        })
+        assert response.status_code == 200
+        assert no_desktop["opened"], "the mail client was never opened"
 
 
 class TestPage:

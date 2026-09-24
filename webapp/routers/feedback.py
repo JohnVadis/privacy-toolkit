@@ -21,12 +21,12 @@ from webapp.formparse import parse_nested
 router = APIRouter()
 
 NO_STORE = {"Cache-Control": "no-store, max-age=0", "Referrer-Policy": "no-referrer"}
-MAX_IMAGE_BYTES = 12 * 1024 * 1024
 MAX_COMMENT = 4000
 
-# A full-screen Retina capture, base64'd, runs to tens of megabytes. This is a
-# local app talking to itself, so the number only needs to be bigger than a
-# screenshot can plausibly be.
+# Starlette caps one form field at 1 MB by default, and a window capture on a Retina
+# display, base64'd, is several — so Send failed before any handler ran and the note
+# was lost. This is a local app talking to itself over loopback; the number only has
+# to be comfortably bigger than a screenshot can plausibly be.
 MAX_IMAGE_BYTES = 64 * 1024 * 1024
 
 # The capture waiting to be annotated. One at a time, in memory, never on disk until
