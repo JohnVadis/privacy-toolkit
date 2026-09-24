@@ -40,6 +40,9 @@ FILES = [
     "build_worklist.py", "pdf_fill.py", "pdf_overlay.py", "pdf_render.py",
     "mapping_edit.py", "form_import.py", "feedback.py", "scaffold_mapping.py",
     "documents.py", "pdf_attachment.py", "import_documents.py",
+    "generation_log.py",                 # imported by the engine — omitting it
+    "case_export.py",                    # broke the copy on the first import
+    "housekeeping.py",                   # the worker's own data-hygiene command
     # the client's own starting point
     "clients/_TEMPLATE.yaml",
 ]
@@ -139,28 +142,55 @@ READ_ME = """PRIVACY REMOVAL TOOLKIT — test copy
 
 TO START
 --------
-Double-click "Start Privacy Toolkit.bat".
+On Windows:  double-click "Start Privacy Toolkit.bat"
+On a Mac:    double-click "Start Privacy Toolkit.command"
 
 The first time, it sets itself up: it builds what it needs and downloads a few
-parts, which takes about a minute and needs an internet connection. It then puts
-a "Privacy Toolkit" icon on your Desktop and opens the app.
+parts, which takes about a minute and needs an internet connection. It then
+opens the app. On Windows it also puts a "Privacy Toolkit" icon on your Desktop —
+after that, use the icon; it opens in about two seconds with no black window.
 
-After that, just use the Desktop icon. It opens in about two seconds and there is
-no black window. Come back to the .bat file only if something breaks — it repairs
-the installation and shows you what went wrong.
+Come back to the launcher only if something breaks — it repairs the installation
+and shows you what went wrong.
 
-If it tells you Python isn't installed: get it from python.org/downloads, and on
-the first screen of the installer tick "Add python.exe to PATH".
+If it says Python isn't installed: get it from python.org/downloads. On Windows,
+tick "Add python.exe to PATH" on the first screen of the installer.
+
+If a Mac refuses to open the launcher, right-click it and choose Open instead.
 
 
 WHAT IT DOES
 ------------
 1. You enter a client's details ONCE.
 2. It fills the Florida forms with those details, ready to print.
-3. It builds a spreadsheet of the opt-out sites with the values each one asks for.
+3. You import the county's list of that client's recorded documents, and it puts
+   them on the Clerk form.
+4. It builds a spreadsheet of the opt-out sites with the values each one asks for.
 
 There is a made-up sample client in the list so you can try it straight away.
 Delete it when you start entering real people.
+
+
+THE DOCUMENTS STEP
+------------------
+The Clerk form has to name the documents being redacted, and it only redacts the
+ones it names. Search the county's Official Records for your client, export the
+results, then use "Documents" on that client and tick the rows that are actually
+theirs.
+
+Two things that will catch you out, both learned the hard way:
+
+* Put a % after the name — searching MARLOWE finds a fraction of what MARLOWE% finds.
+* Search every name the client has used, including a maiden name. A deed is
+  recorded under the name they had at the time.
+
+
+KEEPING A COPY
+--------------
+"Export case" on the Filled forms screen packages one client — their details,
+every form, and the record of what was produced — into a single file. Keep it on
+an encrypted drive. That file holds personal information and is not itself
+locked, so treat losing one the way you'd treat losing this computer.
 
 
 WHAT IT DOES NOT DO — on purpose
@@ -169,6 +199,7 @@ WHAT IT DOES NOT DO — on purpose
   notarised where the county requires it, and file yourself.
 * It never decides whether someone qualifies for an exemption. You set that.
 * It never sends the opt-out requests. Those sites need a person.
+* It never decides which recorded documents are your client's. You tick those.
 
 
 YOUR CLIENTS' DETAILS STAY ON THIS COMPUTER
@@ -177,9 +208,17 @@ The app runs entirely on this machine. Nothing is uploaded, and nothing on your
 network can reach it. Client details live in the "clients" folder and the filled
 forms in "output" — both on this computer only, so keep it locked and backed up.
 
-The one exception is the "Comment" button, which is there for you to send feedback
-about the app. It takes a picture of your screen, so use the "Hide" tool to black
-out anything that shouldn't be shared before you send it.
+Deleted clients are moved to a "trash" folder rather than erased, and the Comment
+button saves pictures into a "feedback" folder. Both fill up with client details
+over time. To see what has accumulated, and clear out the old:
+
+    python housekeeping.py              (shows what is there)
+    python housekeeping.py --prune      (removes what is past its date)
+
+The one exception to nothing leaving this computer is the "Comment" button, which
+is there for you to send feedback about the app. It takes a picture of your
+screen, so use the "Hide" tool to black out anything that shouldn't be shared
+before you send it.
 
 
 IF SOMETHING IS WRONG
@@ -187,6 +226,37 @@ IF SOMETHING IS WRONG
 Press "Comment" at the top of any screen. Mark up the picture, write what you
 expected, and it opens an email. Nothing is sent until you press send yourself.
 """
+
+
+# Files that have to come out of the archive runnable. Windows has no execute bit,
+# so shutil.make_archive writes these as 0644 and a Mac user unzips a launcher that
+# does nothing when double-clicked — the one file they are told to double-click.
+EXECUTABLE_SUFFIXES = {".command", ".sh"}
+EXECUTABLE_MODE = 0o755
+DEFAULT_MODE = 0o644
+
+
+def zip_copy(dest: Path) -> Path:
+    """Zip the built copy, preserving the execute bit on the launchers."""
+    import zipfile
+
+    archive = dest.with_suffix(dest.suffix + ".zip") if dest.suffix else Path(
+        str(dest) + ".zip")
+    if archive.exists():
+        archive.unlink()
+
+    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:
+        for path in sorted(dest.rglob("*")):
+            if not path.is_file():
+                continue
+            inner = Path(dest.name) / path.relative_to(dest)
+            info = zipfile.ZipInfo(inner.as_posix())
+            info.compress_type = zipfile.ZIP_DEFLATED
+            mode = (EXECUTABLE_MODE if path.suffix.lower() in EXECUTABLE_SUFFIXES
+                    else DEFAULT_MODE)
+            info.external_attr = mode << 16
+            zf.writestr(info, path.read_bytes())
+    return archive
 
 
 def check_clean(dest: Path) -> list[str]:
@@ -200,12 +270,15 @@ def check_clean(dest: Path) -> list[str]:
         rel = path.relative_to(dest)
         if any(part in SKIP_DIRS for part in rel.parts):
             problems.append(f"{rel}: should not have been copied")
-        if path.suffix.lower() in (".yaml", ".txt", ".py", ".html", ".css", ".js", ".bat"):
+        # Every text file we ship, so a value can't hide in one nobody thought to
+        # scan — the macOS launcher was exactly that gap.
+        if path.suffix.lower() in (".yaml", ".yml", ".txt", ".py", ".html", ".css",
+                                   ".js", ".bat", ".command", ".sh", ".json", ".md"):
             text = path.read_text(encoding="utf-8", errors="replace")
             for marker in markers:
                 if marker in text:
                     problems.append(f"{rel}: contains {marker!r} from a real client file")
-    for folder in ("output", "trash", "feedback"):
+    for folder in ("output", "trash", "feedback", "exports"):
         stray = list((dest / folder).glob("*")) if (dest / folder).is_dir() else []
         if stray:
             problems.append(f"{folder}/ is not empty: {[p.name for p in stray]}")
@@ -236,9 +309,8 @@ def main():
           "files: none of them appear in the copy.")
 
     if args.zip:
-        archive = shutil.make_archive(str(dest), "zip", root_dir=dest.parent,
-                                      base_dir=dest.name)
-        size = Path(archive).stat().st_size / (1024 * 1024)
+        archive = zip_copy(dest)
+        size = archive.stat().st_size / (1024 * 1024)
         print(f"Zipped: {archive}  ({size:.1f} MB)")
 
 
