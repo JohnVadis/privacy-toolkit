@@ -9,16 +9,32 @@ release. Nothing on the Mac: no Python, no Terminal, no launcher.
 
 **Download:** <https://github.com/JohnVadis/privacy-toolkit/releases/tag/macos-build>
 
-Take `Privacy Toolkit (macOS).zip`, unzip it, and put the `Privacy Toolkit` folder
-wherever you keep work. Inside is `Privacy Toolkit.app` plus the files it reads and
-writes — `clients/`, `output/`, `forms/`, `sites.yaml`. Double-click the app.
+There are two files, one per chip. A Mac build runs only on the architecture it was
+made for, so the wrong one simply won't open:
 
-Keep the app and those folders together: the app writes client files **beside**
-itself, so moving only the .app leaves the cases behind.
+| Their Mac | File |
+|---|---|
+| Apple Silicon (M1–M4) — anything sold since late 2020 | `...for apple-silicon Macs.zip` |
+| Intel | `...for intel Macs.zip` |
 
-The first launch, macOS will say it *"cannot be opened because Apple cannot check it
-for malicious software"* — it's unsigned, and buying a certificate is a separate
-decision. **Right-click the app → Open → Open.** Once only.
+( menu → About This Mac says which.)
+
+Unzip it, and move the whole `Privacy Toolkit` folder somewhere they keep work.
+Inside is `Privacy Toolkit.app` plus the files it reads and writes — `clients/`,
+`output/`, `forms/`, `sites.yaml`. Double-click the app.
+
+**Keep the folder together.** The app writes client files *beside* itself, so moving
+only the .app leaves the cases behind.
+
+The first launch, macOS will refuse: *"Apple could not verify… is free of malware"*.
+The app is ad-hoc signed — enough that Apple Silicon will run it at all — but not
+signed with a paid Developer ID, which is what silences that dialog.
+**Right-click the app → Open → Open.** Once only.
+
+A tester who instead sees *"the application is damaged"* has a quarantine flag on the
+download, not a bad build: `xattr -cr` the folder, then open it as above. Both of
+these are spelled out in the release notes and in READ ME FIRST.txt inside the
+folder, so they shouldn't need to ask.
 
 ### Rebuilding it
 
@@ -26,6 +42,10 @@ After any change to the toolkit, push to `master`, then Actions →
 **build macOS app** → *Run workflow*. It runs the full test suite first and refuses
 to publish an app whose engine is broken. The release is replaced in place, so the
 download link never changes.
+
+Both architectures build in parallel. Apple Silicon takes about 90 seconds; the Intel
+runners are scarcer and can sit queued for a while, so the Apple Silicon file often
+appears well before the Intel one. That's a queue, not a failure.
 
 ```bash
 gh workflow run build-macos.yml --ref master     # from a terminal, if you prefer
