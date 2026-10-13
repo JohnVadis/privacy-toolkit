@@ -1,0 +1,8 @@
+# Only for optout_assist.py — the assisted opt-out filler. Kept out of
+# requirements.txt so "Start Privacy Toolkit.bat" stays a fast install for someone
+# who never uses it. Pinned exactly, like everything else.
+#
+# Playwright drives the Edge or Chrome already on the machine, so no browser
+# download is needed. Without either: python -m playwright install chromium
+-r requirements.txt
+playwright==1.62.0

@@ -2,24 +2,85 @@
 # `needs` lists the client variables that site's form asks for (used to pre-fill the
 # worklist so the worker copies/pastes instead of retyping).
 #
+# The list and its order follow the practice's own checklist ("The Process" sheet,
+# 2026-10-12): data brokers, then real estate, maps, and Google's removal tool last —
+# Google only shows what's still out there once the sources above are gone. The
+# Government section of that sheet is the PDF forms side of the toolkit, and its
+# Boolean-search rows are how exposures are found, so neither is listed here.
+#
+# `client_needed:` — the site needs the CLIENT themselves (a call, a text code, their
+# own login). Shown prominently by the Opt-out Assistant so it can be arranged first.
+#
 # NOTE: These sites use CAPTCHAs, email verification, and their own terms of service.
 # This tool PREPARES the values and tracks status — a human does the actual submit.
+#
+# Keys are what a client's worklist matches its rows on. Don't rename one; add a new
+# key and remove the old one, and the worklist keeps the old row's history.
+#
+# optout_assist.py fills these forms by matching field labels, so most sites need
+# nothing extra. If a site's fields have labels it can't read, add selectors that
+# are tried first — check them in the browser's inspector, they change:
+#   fill:
+#     - { selector: "#first-name", from: first_name }
+#     - { selector: "input[name=zip]", from: home_zip }
 
-- key: fastbackgroundcheck
-  name: FastBackgroundCheck
+# --- Data brokers ------------------------------------------------------------
+- key: acxiom
+  name: Acxiom
   category: data_broker
-  opt_out_url: "https://www.fastbackgroundcheck.com/removal"
-  needs: [full_name, home_city, home_state, email]
+  opt_out_url: "https://omnicom-privacy.my.onetrust.com/webform/c0a325be-6f68-46be-a0de-e4a750890f7d/eabea7bc-0774-4fb2-8906-d0c1adedb2c2"
+  needs: [first_name, last_name, home_line1, home_city, home_state, home_zip, email, phone]
   supports_agent: true
-  notes: "Find the listing, confirm it's the client, then submit. Email verification follows."
+  notes: "Acxiom Authorized Agent Portal (OneTrust; the old link now redirects here). Email verification follows."
 
-- key: whitepages
-  name: Whitepages
+- key: beenverified
+  name: BeenVerified
   category: data_broker
-  opt_out_url: "https://www.whitepages.com/suppression-requests"
-  needs: [full_name, home_city, home_state]
+  opt_out_url: "https://www.beenverified.com/svc/optout/search/optouts"
+  needs: [first_name, last_name, home_state, email]
+  supports_agent: true
+  notes: "Search, pick the client's record, then confirm by email. A Cloudflare check may show first — it clears on its own after a few seconds."
+
+- key: infotracer
+  name: InfoTracer
+  category: data_broker
+  opt_out_url: "https://infotracer.com/optout/"
+  needs: [full_name, home_city, home_state, dob, email]
+  supports_agent: true
+  notes: "Click \"Check Me\" first. Then search by name and state, tick the client's record, \"Remove data\", enter the email, confirm by email."
+
+- key: intelius
+  name: Intelius (PeopleConnect)
+  category: data_broker
+  opt_out_url: "https://suppression.peopleconnect.us/login"
+  needs: [full_name, dob, email, phone]
   supports_agent: false
-  notes: "Locate the specific profile URL first; phone verification is common."
+  client_needed: "The client has to receive a text message code — have them available."
+  notes: "One PeopleConnect suppression covers its sister sites."
+
+- key: lexisnexis
+  name: LexisNexis
+  category: data_broker
+  opt_out_url: "https://consumer.risk.lexisnexis.com/optrequest"
+  needs: [full_name, dob, home_full, phone, email]
+  supports_agent: true
+  notes: "Opt-Out/Opt-In Request form. They may ask for proof of identity."
+
+- key: mylife
+  name: MyLife
+  category: data_broker
+  opt_out_url: "https://www.mylife.com/privacyrequest"
+  needs: [full_name, home_city, home_state, dob, email]
+  supports_agent: true
+  notes: ""
+
+- key: radaris
+  name: Radaris
+  category: data_broker
+  opt_out_url: "https://radaris.com/control-privacy"
+  needs: [full_name, home_city, home_state, email]
+  supports_agent: false
+  notes: "Account/verification step; re-check after ~2 weeks. On 2026-10-12 this page said the radaris.com domain had been transferred by court order — check what it shows now before relying on it."
 
 - key: spokeo
   name: Spokeo
@@ -29,26 +90,159 @@
   supports_agent: false
   notes: "Requires the exact Spokeo profile URL + email confirmation."
 
-- key: radaris
-  name: Radaris
+- key: truepeoplesearch
+  name: TruePeopleSearch
   category: data_broker
-  opt_out_url: "https://radaris.com/control/privacy"
+  opt_out_url: "https://www.truepeoplesearch.com/removal"
   needs: [full_name, home_city, home_state, email]
-  supports_agent: false
-  notes: "Account/verification step; re-check after ~2 weeks."
+  supports_agent: true
+  notes: "Find the record, confirm it's the client, then remove."
 
+- key: whitepages
+  name: Whitepages
+  category: data_broker
+  opt_out_url: "https://www.whitepages.com/suppression-requests"
+  needs: [full_name, home_city, home_state, phone]
+  supports_agent: false
+  client_needed: "Whitepages calls to verify — the client has to be available for the phone call."
+  notes: "Locate the specific profile URL first."
+
+- key: thatsthem
+  name: That's Them
+  category: data_broker
+  opt_out_url: "https://thatsthem.com/optout"
+  needs: [full_name, home_full, phone, email]
+  supports_agent: true
+  notes: ""
+
+- key: instantcheckmate
+  name: Instant Checkmate
+  category: data_broker
+  opt_out_url: "https://www.instantcheckmate.com/privacy-center"
+  needs: [first_name, last_name, home_state, dob, email]
+  supports_agent: true
+  notes: "Privacy center: search, select the record, confirm by email."
+
+- key: nuwber
+  name: Nuwber
+  category: data_broker
+  opt_out_url: "https://nuwber.com/removal/link"
+  needs: [full_name, email]
+  supports_agent: true
+  notes: "Needs the listing's URL, then email confirmation. On 2026-10-12 nuwber.com did not exist in DNS at all (reported elsewhere as shut down) — if it still won't load, skip it and re-check next cycle."
+
+- key: fastbackgroundcheck
+  name: FastBackgroundCheck
+  category: data_broker
+  opt_out_url: "https://www.fastbackgroundcheck.com/optout"
+  needs: [full_name, home_city, home_state, email]
+  supports_agent: true
+  notes: "Find the listing, confirm it's the client, then submit. Email verification follows."
+
+- key: familytreenow
+  name: FamilyTreeNow
+  category: data_broker
+  opt_out_url: "https://www.familytreenow.com/optout"
+  needs: [first_name, last_name, dob, home_state, email]
+  supports_agent: true
+  notes: ""
+
+- key: cyberbackgroundchecks
+  name: CyberBackgroundChecks
+  category: data_broker
+  opt_out_url: "https://www.cyberbackgroundchecks.com/removal"
+  needs: [full_name, home_city, home_state, email]
+  supports_agent: true
+  notes: "Tick Cloudflare's \"Verify you are human\" box first, then the removal form shows."
+
+- key: floridaresidentsdirectory
+  name: Florida Residents Directory
+  category: data_broker
+  opt_out_url: "https://www.floridaresidentsdirectory.com/opt-out"
+  needs: [full_name, home_full, email]
+  supports_agent: true
+  notes: ""
+
+- key: usphonebook
+  name: USPhoneBook
+  category: data_broker
+  opt_out_url: "https://www.usphonebook.com/removal"
+  needs: [full_name, phone, email]
+  supports_agent: true
+  notes: "The removal page starts with a search: find the client's listing, then remove it. Its removal email comes from UnMask — do UnMask next."
+
+- key: unmask
+  name: UnMask
+  category: data_broker
+  opt_out_url: "https://unmask.com/opt-out"
+  needs: [full_name, phone, email]
+  supports_agent: true
+  notes: ""
+
+- key: voterrecords
+  name: VoterRecords
+  category: data_broker
+  opt_out_url: "https://voterrecords.com/"
+  needs: [full_name, home_city, home_state, email]
+  supports_agent: true
+  notes: "No single opt-out page: search, open the client's record, scroll to the very bottom and click \"Record Opt-Out\". Confirm by email."
+
+# --- Real estate -------------------------------------------------------------
 - key: zillow
   name: Zillow
   category: property_site
-  opt_out_url: "https://www.zillow.com/z/privacy/"
+  opt_out_url: "https://www.zillow.com/how-much-is-my-home-worth/"
   needs: [full_name, home_full]
   supports_agent: true
-  notes: "Owner privacy / info-removal request for the specific listing. Confirm it's the residence."
+  notes: "Enter the address and claim the home as the owner, then remove the photos (or ask Zillow's Help Center to, for privacy). Sale prices from county records stay."
 
+- key: redfin
+  name: Redfin
+  category: property_site
+  opt_out_url: "https://www.redfin.com/myredfin/owner-dashboard"
+  needs: [full_name, home_full, email]
+  supports_agent: true
+  notes: "Claim the home in the Owner Dashboard, then open it and Edit Photos to remove them."
+
+- key: realtor
+  name: Realtor.com
+  category: property_site
+  opt_out_url: "https://www.realtor.com/myhome"
+  needs: [full_name, home_full, email]
+  supports_agent: true
+  notes: "My Home: enter the address, prove ownership, then Remove Photos from the owner dashboard."
+
+# --- Maps --------------------------------------------------------------------
+- key: google_maps
+  name: Google Maps
+  category: maps
+  opt_out_url: "https://www.google.com/maps/"
+  needs: [home_full, email]
+  supports_agent: true
+  notes: "Open the house in Street View → Report a problem → request a blur of the home."
+
+- key: bing_maps
+  name: Bing Maps
+  category: maps
+  opt_out_url: "https://www.bing.com/maps"
+  needs: [home_full, email]
+  supports_agent: true
+  notes: "Open Streetside at the house → Report a privacy concern → blur the home."
+
+- key: apple_maps
+  name: Apple Maps
+  category: maps
+  opt_out_url: "https://maps.apple.com/imagecollection"
+  needs: [home_full, email]
+  supports_agent: true
+  notes: "No form — email MapsImageCollection@apple.com asking to blur the home in Look Around (name, exact address, a screenshot). Apple replies asking for proof of ownership."
+
+# --- Search engines (last) ---------------------------------------------------
 - key: google_results_about_you
   name: Google — Results about you
   category: search_engine
   opt_out_url: "https://myactivity.google.com/results-about-you"
   needs: [full_name, home_full, phone, email]
   supports_agent: false
+  client_needed: "The client has to do this from their own Google account."
   notes: "Do this AFTER the underlying source is removed/changed. Residual PII only."

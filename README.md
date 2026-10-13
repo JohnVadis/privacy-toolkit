@@ -263,6 +263,22 @@ Edit `sites.yaml` to match the client's checklist, then:
 python build_worklist.py --client clients/lastname_firstname.yaml
 ```
 
+### 6. Fill the opt-out forms (optional)
+Double-click **Start Opt-out Assistant.bat** (the first time it downloads one extra
+part). A small window opens beside the browser:
+
+1. Pick the client and the person; the sites not yet worked are already ticked.
+2. **Start** — the browser opens at the first site. Find the client's listing.
+3. **Fill the form** — the form fills from the client file. Anything it can't place
+   (profile URLs, reasons) is listed for you, and every value has a **Copy** button.
+4. Check it, solve the CAPTCHA and click the site's own Submit button.
+5. **I clicked Submit** or **They emailed a verification link** — the date, the
+   confirmation number and a re-check date go into the worklist. **Skip** moves on.
+
+Nothing is ever submitted for you, and the browser keeps nothing once it closes.
+From a terminal: `python optout_panel.py`, or `python optout_assist.py --client
+clients/<name>.yaml --terminal` for the keyboard-only version.
+
 ## Tests
 ```bash
 pip install -r requirements-dev.txt
@@ -362,7 +378,8 @@ you're sure — that folder is gitignored, like `clients/` and `output/`.
 - **Eligibility** — confirm the client actually qualifies for the claimed exemption
   before generating anything that asserts it. The tool doesn't judge eligibility.
 - **Opt-out sites** use CAPTCHAs and email verification; the worklist prepares the
-  values and tracks status, a human does the click-and-submit.
+  values and tracks status, `optout_assist.py` can type them in, and a human does
+  the check-and-submit.
 - **Finding the documents** — the toolkit imports a record list, it does not search the
   Clerk for you. A person runs the search and decides which records belong on the
   request; there is no scraper here and no call to any county system.
@@ -424,5 +441,7 @@ mapping_edit.py     check/back up/save/reposition a mapping; `python mapping_edi
 form_import.py      read a blank PDF and propose a mapping for it
 pdf_render.py       render a PDF page to PNG (previews, and the click-to-place picker)
 build_worklist.py   per-client: pre-filled opt-out worklist (.xlsx)
+optout_assist.py    per-client: fill opt-out forms in a browser; you submit
+optout_panel.py     the Opt-out Assistant window over optout_assist.py
 webapp/             the local web UI (FastAPI + HTMX). Wraps the engine, never duplicates it
 ```

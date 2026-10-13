@@ -34,6 +34,7 @@ for previews.
 | `test_pdf_overlay.py` | Geometry: text fitting, table row pitch, 1-based page → 0-based index, anchors. |
 | `test_fill_forms.py` | The engine end to end on a synthetic form, table overflow and attachments, and both drift guards. |
 | `test_build_worklist.py` | That rebuilding never loses tracked work — the spreadsheet IS the tracker. |
+| `test_optout_assist.py` | Field matching, worklist write-back, and — in a headless browser against a local fake form — that it fills, skips CAPTCHA/profile-URL/hidden fields, keeps the worker's typing, and never submits. The browser tests skip without Playwright. |
 | `test_validate_client.py` | That validation blocks what it should, warns about the rest, and never decides eligibility. |
 | `test_mapping_edit.py` | That **every shipped mapping still checks clean**, plus the structural rules. |
 | `test_golden_hillsborough.py` | The one that protects a filing: named values at known coordinates on the county's own PDF. |

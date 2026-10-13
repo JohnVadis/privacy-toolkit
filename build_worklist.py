@@ -55,6 +55,15 @@ def load_sites(sites_path=None) -> list[dict]:
         return yaml.safe_load(fh) or []
 
 
+def _header_row(ws) -> int | None:
+    """The row holding the column headers. Row 4 when the toolkit wrote the sheet,
+    but a worker may have inserted or deleted a row above it in Excel."""
+    for r in range(1, min(ws.max_row, 30) + 1):
+        if any(c.value == "Site" for c in ws[r]):
+            return r
+    return None
+
+
 def read_tracking(path) -> dict:
     """What the worker has already recorded in an existing worklist.
 
@@ -73,13 +82,14 @@ def read_tracking(path) -> dict:
 
         wb = load_workbook(path, data_only=True)
         ws = wb.active
-        headers = [c.value for c in ws[HEADER_ROW]]
-        index = {h: i for i, h in enumerate(headers) if h}
-        if "Site" not in index:
+        header_row = _header_row(ws)
+        if header_row is None:
             return {}
+        headers = [c.value for c in ws[header_row]]
+        index = {h: i for i, h in enumerate(headers) if h}
 
         tracked = {}
-        for row in ws.iter_rows(min_row=HEADER_ROW + 1, values_only=True):
+        for row in ws.iter_rows(min_row=header_row + 1, values_only=True):
             if not any(v not in (None, "") for v in row):
                 continue
 
@@ -117,7 +127,10 @@ def _backup_existing(path: Path) -> Path | None:
         return None
     dest_dir = path.parent / BACKUP_DIRNAME
     dest_dir.mkdir(parents=True, exist_ok=True)
-    dest = dest_dir / f"{path.stem}.{_dt.datetime.now():%Y-%m-%d_%H%M%S}{path.suffix}"
+    # Down to the microsecond: record_progress can back up twice in one second
+    # (before a merge-rebuild, then before its own save), and a name that only
+    # went to the second let the second copy overwrite the first.
+    dest = dest_dir / f"{path.stem}.{_dt.datetime.now():%Y-%m-%d_%H%M%S_%f}{path.suffix}"
     shutil.copy2(path, dest)
     return dest
 
@@ -206,7 +219,8 @@ def build_worklist(client: dict, person: str | None = None, sites_path=None,
             prior.get("Confirmation / ref") or "",
             prior.get("Verify by") or "",
             prior.get("Notes") or "",
-            site.get("notes", ""),
+            # What the client has to do comes first — it's what has to be arranged.
+            " ".join(x for x in (site.get("client_needed"), site.get("notes")) if x),
             key,
         ])
         r += 1
@@ -249,6 +263,83 @@ def build_worklist(client: dict, person: str | None = None, sites_path=None,
 
     if stats is not None:
         stats.update(counts, backup=backup)
+    return out_path
+
+
+def record_progress(client: dict, site_key: str, *, status: str | None = None,
+                    submitted: str | None = None, confirmation: str | None = None,
+                    verify_by: str | None = None, note: str | None = None,
+                    sites_path=None) -> Path:
+    """Write one site's progress into the client's worklist and return its path.
+
+    Only the worker's columns are touched, and only the ones passed: a None leaves
+    the cell as it is. `note` is APPENDED to Notes, never replaces it — the Notes
+    cell is the worker's own record. The sheet is built first if it doesn't exist,
+    and backed up before it is changed, exactly as a rebuild would.
+
+    Raises ClientDataError if the site isn't in the sheet or the file is open in
+    another program (Excel locks it on Windows).
+    """
+    if status is not None and status not in STATUSES:
+        raise ClientDataError(f"unknown status {status!r}")
+
+    out_path = output_dir(client) / WORKLIST_FILENAME
+    if not out_path.is_file():
+        build_worklist(client, sites_path=sites_path)
+
+    from openpyxl import load_workbook
+
+    def locate(wb):
+        ws = wb.active
+        header_row = _header_row(ws)
+        if header_row is None:
+            return ws, {}, None
+        headers = [c.value for c in ws[header_row]]
+        cols = {h: i + 1 for i, h in enumerate(headers) if h}
+        for r in range(header_row + 1, ws.max_row + 1):
+            key = ws.cell(row=r, column=cols[KEY_COLUMN]).value if KEY_COLUMN in cols else None
+            if str(key or "").strip() == site_key:
+                return ws, cols, r
+        return ws, cols, None
+
+    unreadable = ClientDataError(
+        f"{out_path.name} isn't laid out the way the toolkit wrote it (a header or "
+        "column was renamed or removed?), so nothing was written to it. Rebuild it "
+        "from the Privacy Toolkit — the current one is backed up first.")
+    try:
+        wb = load_workbook(out_path)
+    except Exception:  # noqa: BLE001 — damaged or not a workbook
+        raise unreadable
+    ws, cols, row = locate(wb)
+    # Rebuilding a sheet we can't read would replace the worker's record with an
+    # empty one. Only a sheet we CAN read, that just lacks this site, is rebuilt.
+    if not cols or not {"Site", *USER_COLUMNS} <= set(cols):
+        raise unreadable
+    if row is None:
+        # Built before this site joined the catalog (or before the Key column) —
+        # a rebuild merges it in without losing anything, then try once more.
+        build_worklist(client, sites_path=sites_path)
+        wb = load_workbook(out_path)
+        ws, cols, row = locate(wb)
+    if row is None:
+        raise ClientDataError(f"site {site_key!r} is not in the worklist or sites.yaml")
+
+    updates = {"Status": status, "Submitted": submitted,
+               "Confirmation / ref": confirmation, "Verify by": verify_by}
+    for column, value in updates.items():
+        if value is not None:
+            ws.cell(row=row, column=cols[column], value=value)
+    if note:
+        cell = ws.cell(row=row, column=cols["Notes"])
+        cell.value = f"{cell.value}\n{note}" if cell.value else note
+
+    _backup_existing(out_path)
+    try:
+        wb.save(out_path)
+    except PermissionError:
+        raise ClientDataError(
+            f"{out_path.name} is open in another program. Close it and try again — "
+            "nothing was changed.")
     return out_path
 
 

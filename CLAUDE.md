@@ -28,6 +28,9 @@ by scattering `sys.platform` checks; `tests/test_platforms.py` covers the dispat
    none should be added.
 3. **Opt-out sites are prepared, not submitted.** They gate on CAPTCHAs and email
    verification; `build_worklist.py` produces values + a status tracker, a human clicks.
+   `optout_assist.py` may FILL a site's form in a visible browser, but it never clicks,
+   presses Enter, submits, touches a CAPTCHA, or overwrites what the worker typed —
+   the worker reviews and clicks Submit. Don't add any of those.
 4. **PII never gets committed.** `clients/*` (including `_backups/`), `output/`,
    `trash/` and `feedback/` are gitignored. SSN is never stored anywhere (the FL
    redaction workflow doesn't need it). Check `git check-ignore` before adding any
@@ -73,6 +76,15 @@ python import_documents.py --client clients/<name>.yaml export.csv --dry-run
 
 # Build the opt-out worklist spreadsheet (MERGES — never destroys tracked status)
 python build_worklist.py --client clients/<name>.yaml
+
+# Fill opt-out forms in a browser; the worker reviews and clicks Submit, then says so
+# and it's recorded in the worklist. Needs: pip install -r requirements-optout.txt
+# Non-technical path: double-click "Start Opt-out Assistant.bat"
+python optout_panel.py                                          # the window
+python optout_assist.py --client clients/<name>.yaml --terminal # keyboard version
+python optout_assist.py --client clients/<name>.yaml --terminal --sites spokeo,radaris
+python optout_assist.py --client clients/<name>.yaml --terminal --all --person spouse
+python optout_assist.py --client clients/<name>.yaml --list
 
 # Package a case into one file (backup, handover, closing record)
 python case_export.py --client clients/<name>.yaml
@@ -152,6 +164,26 @@ display name, because two clients can share a display name and then share a fold
 - `sites.yaml` + `build_worklist.py` — opt-out catalog → per-client tracker (.xlsx).
   Rebuilding MERGES: the worker's Status/Submitted/Confirmation/Notes are read back
   out and carried across, matched on a hidden Key column. Never make it overwrite.
+  `record_progress()` writes one site's columns back (Notes are appended, never replaced).
+- `optout_assist.py` — Playwright drives the installed Edge/Chrome, headed, with a
+  throwaway profile. Fields are matched by label/name/autocomplete against
+  `FIELD_RULES` (pure `plan_fills()`, testable without a browser); a site's own
+  `fill:` selectors in sites.yaml go first. `NEVER_FILL` and `CAPTCHA_FRAMES` keep it
+  off CAPTCHAs, profile URLs, passwords and other people's / other facts' boxes
+  (spouse, place of birth, card expiry…); a box asking for two kinds of answer is a
+  search box and is left. The LABEL decides, never the input type (sites use
+  type="tel" for ZIP and DOB). Invisible fields (honeypots) are skipped, a dropdown
+  without a placeholder counts as the worker's choice, a tab on another domain needs a
+  yes, and filling stops if the site's own script navigates. The worklist's Status is
+  the FIRST person's (`is_worklist_person`); anyone else's progress goes in Notes.
+  `record_progress` refuses — never rebuilds over — a sheet it can't read. Playwright
+  is in `requirements-optout.txt`, not requirements.txt, and is imported lazily.
+- `sites.yaml` follows the practice's own checklist ("The Process" sheet), in its
+  order. `client_needed:` marks a site the client must take part in (a call, a text
+  code, their own Google account); the window lists those up front to schedule.
+- `optout_panel.py` — the Opt-out Assistant: a tkinter window over the same engine
+  (`Session` holds the logic, `App` is only widgets). Deliberately NOT buttons
+  injected into the broker's page — that page's own scripts could press them.
 - `webapp/` — FastAPI + HTMX UI in a desktop window. Imports the engine; no fill logic of its own.
 - `webapp/security.py` — Host / cross-site / session-token gate in front of every request.
 - `webapp/desktop.py` — the pywebview window; server on a background thread. Downloads

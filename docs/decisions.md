@@ -40,6 +40,14 @@ Eligibility determination, notarization, signing, and submission stay with a per
 The tool prepares paperwork; it does not decide who qualifies or file anything. This is
 both correct (statutory judgment) and safer (a wrong auto-filing affects a real record).
 
+For opt-out sites the line sits at the Submit button (2026-10-09). `optout_assist.py`
+fills a site's form from the client file in a visible browser — the retyping is the
+drudgery — but the worker confirms the listing is the client's, checks the values,
+solves the CAPTCHA and clicks Submit. It matches fields generically rather than
+scraping per-site, so a redesigned form degrades to "fewer fields filled", never to a
+wrong submission. This is not D2's in-house removal engine: it reads nothing back
+from a site and submits nothing.
+
 ## D5 — PII handling
 `clients/` and `output/` are gitignored; real client files never get committed. SSN is
 never stored — the FL redaction workflow explicitly says do not list it, and the forms
