@@ -139,5 +139,60 @@ def main() -> int:
     return 0
 
 
+def optout_main(argv: list[str]) -> int:
+    """The Opt-out Assistant — the same executable started with --optout.
+
+    The toolkit's worklist page starts it (webapp/deps.launch_optout). One program
+    rather than two keeps the no-Python build a single thing to ship and to trust.
+    """
+    import argparse
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--optout", action="store_true")
+    ap.add_argument("--optout-check", action="store_true")
+    ap.add_argument("--client")
+    args, _unknown = ap.parse_known_args(argv)
+    if args.optout_check:
+        return _optout_check()
+    try:
+        import optout_panel
+        optout_panel.App(client_path=args.client).run()
+    except Exception as exc:  # noqa: BLE001 — no console in a frozen app
+        problem(f"The Opt-out Assistant could not start.\n\n{exc}")
+        return 1
+    return 0
+
+
+def _optout_check() -> int:
+    """Can this build drive a browser? Exit 0 if so. For the build checks: starts
+    the bundled Playwright driver and an installed Edge/Chrome, invisibly, and stops."""
+    try:
+        from playwright.sync_api import sync_playwright
+
+        import optout_assist
+        import optout_panel  # noqa: F401 — the window's imports must resolve too
+
+        with sync_playwright() as pw:
+            for channel in optout_assist.BROWSER_CHANNELS:
+                try:
+                    browser = pw.chromium.launch(channel=channel, headless=True)
+                except Exception:  # noqa: BLE001
+                    continue
+                page = browser.new_page()
+                page.set_content("<input id=x aria-label='First name'>")
+                filled = optout_assist.fill_page(
+                    page, {"first_name": "Check"})["filled"]
+                browser.close()
+                print(f"ok: {channel or 'chromium'}, filled {len(filled)}")
+                return 0 if filled else 3
+        print("no browser could be started")
+        return 2
+    except Exception as exc:  # noqa: BLE001
+        print(f"failed: {type(exc).__name__}: {exc}")
+        return 1
+
+
 if __name__ == "__main__":
+    if "--optout" in sys.argv or "--optout-check" in sys.argv:
+        raise SystemExit(optout_main(sys.argv[1:]))
     raise SystemExit(main())

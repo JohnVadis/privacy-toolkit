@@ -17,7 +17,7 @@ from fastapi.templating import Jinja2Templates
 from jinja2 import pass_context
 
 from client_context import client_path, load_client
-from paths import (BUNDLED, CLIENTS_DIR, OUTPUT_DIR, RESERVED_CLIENT_STEMS,
+from paths import (BUNDLED, CLIENTS_DIR, OUTPUT_DIR, RESERVED_CLIENT_STEMS, ROOT,
                    contains)
 
 # Read-only and shipped inside the executable when frozen.
@@ -136,6 +136,40 @@ def reveal(path) -> None:
             subprocess.Popen(["xdg-open", str(path.parent)])
     except Exception:
         pass
+
+
+def optout_command(slug: str) -> list[str]:
+    """How to start the Opt-out Assistant (optout_panel.py) for this client.
+
+    Frozen, it is this same executable in another mode (webapp/desktop.py
+    --optout), so the no-Python build ships one program, not two. From source it is
+    the panel script, under pythonw where there is one so no console opens.
+    """
+    import sys
+
+    client = f"{slug}.yaml"                    # the panel picks it by name
+    if getattr(sys, "frozen", False):
+        return [sys.executable, "--optout", "--client", client]
+    exe = Path(sys.executable)
+    windowless = exe.with_name("pythonw.exe")
+    python = windowless if windowless.is_file() else exe
+    return [str(python), str(ROOT / "optout_panel.py"), "--client", client]
+
+
+def launch_optout(slug: str) -> bool:
+    """Start the Opt-out Assistant beside the app. False if it couldn't be started.
+
+    A separate process with its own window: it drives a web browser, which the app's
+    own window must never do (see docs/decisions.md D4). It outlives this page and
+    this app — closing the toolkit doesn't close a half-done opt-out session.
+    """
+    import subprocess
+
+    try:
+        subprocess.Popen(optout_command(slug), cwd=str(ROOT))
+        return True
+    except Exception:  # noqa: BLE001 — the page reports it; nothing else depends on it
+        return False
 
 
 def collector() -> tuple[list, callable]:

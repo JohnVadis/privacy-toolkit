@@ -247,6 +247,51 @@ class TestWorklist:
         assert "Rebuilding keeps everything you've filled in" in body
 
 
+class TestOptoutAssistant:
+    def test_the_button_starts_it_for_this_client(self, app_client, example_client,
+                                                   monkeypatch):
+        import webapp.routers.generate as route
+
+        started = []
+        monkeypatch.setattr(route, "launch_optout",
+                            lambda slug: started.append(slug) or True)
+        save_client("Worklisted", example_client)
+        assert "Open the Opt-out Assistant" in app_client.get(
+            "/clients/Worklisted/worklist").text
+        response = app_client.post("/clients/Worklisted/optout-assistant")
+        assert started == ["Worklisted"]
+        assert "Opening the Opt-out Assistant" in response.text
+
+    def test_a_failed_start_says_so(self, app_client, example_client, monkeypatch):
+        import webapp.routers.generate as route
+
+        monkeypatch.setattr(route, "launch_optout", lambda slug: False)
+        save_client("Worklisted", example_client)
+        body = app_client.post("/clients/Worklisted/optout-assistant").text
+        assert "couldn't be started" in body
+
+    def test_needs_the_session(self, raw_client, example_client, monkeypatch):
+        import webapp.routers.generate as route
+
+        started = []
+        monkeypatch.setattr(route, "launch_optout", lambda slug: started.append(slug))
+        save_client("Worklisted", example_client)
+        raw_client.post("/clients/Worklisted/optout-assistant")
+        assert started == []                    # another page can't start it
+
+    def test_the_command_frozen_and_from_source(self, monkeypatch):
+        import sys
+
+        from webapp import deps
+
+        source = deps.optout_command("Some Client")
+        assert source[1].endswith("optout_panel.py")
+        assert source[-2:] == ["--client", "Some Client.yaml"]
+        monkeypatch.setattr(sys, "frozen", True, raising=False)
+        assert deps.optout_command("Some Client") == [
+            sys.executable, "--optout", "--client", "Some Client.yaml"]
+
+
 class TestFormsOverview:
     def test_lists_the_mappings_read_only(self, app_client):
         body = app_client.get("/forms").text

@@ -21,8 +21,8 @@ from build_worklist import WORKLIST_FILENAME, build_worklist, load_sites
 from client_context import ClientDataError, person_roles
 from fill_forms import fill_client, generated_files, list_mappings, output_dir
 from validate_client import errors, validate_client, warnings
-from webapp.deps import (collector, get_client, output_file, reveal,
-                         templates, url_for)
+from webapp.deps import (collector, get_client, launch_optout, output_file,
+                         reveal, templates, url_for)
 from webapp.formparse import parse_nested
 
 router = APIRouter()
@@ -299,8 +299,23 @@ async def worklist_page(request: Request, slug: str):
     return templates.TemplateResponse(
         request=request, name="worklist.html",
         context=_worklist_context(request, slug, client,
-                                  built=existing.name if existing.is_file() else None),
+                                  built=existing.name if existing.is_file() else None,
+                                  assistant=request.query_params.get("assistant")),
     )
+
+
+@router.post("/clients/{slug}/optout-assistant", name="optout_launch")
+async def optout_launch(request: Request, slug: str):
+    """Open the Opt-out Assistant window for this client.
+
+    Only starts it: the assistant fills forms in a browser and the worker submits
+    them, all in its own window (optout_panel.py). Nothing is sent from here.
+    """
+    slug, _client = get_client(slug)
+    started = "1" if launch_optout(slug) else "0"
+    return RedirectResponse(
+        url_for(request, "worklist_page", slug=slug) + f"?assistant={started}",
+        status_code=303)
 
 
 @router.post("/clients/{slug}/worklist", response_class=HTMLResponse, name="worklist_run")

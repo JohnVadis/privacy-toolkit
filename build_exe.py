@@ -81,7 +81,16 @@ HIDDEN = [
     "uvicorn.protocols.websockets.auto", "uvicorn.lifespan.on",
     "pypdfium2", "pdfplumber", "reportlab.pdfgen.canvas", "openpyxl",
     "PIL.ImageGrab",
+    # The Opt-out Assistant: the same executable started with --optout.
+    "optout_panel", "optout_assist", "tkinter", "tkinter.ttk", "tkinter.messagebox",
+    "playwright.sync_api",
 ]
+
+# Whole packages whose files (not just modules) are needed. Playwright drives the
+# browser through its own bundled driver — a node runtime and scripts — which
+# PyInstaller doesn't know about. It drives the Edge/Chrome already installed, so
+# no browser is shipped.
+COLLECT_ALL = ["playwright"]
 
 # The webview backend differs, and PyInstaller only finds the one it can see.
 HIDDEN += (["webview.platforms.cocoa",
@@ -92,7 +101,7 @@ HIDDEN += (["webview.platforms.cocoa",
            if MACOS
            else ["webview.platforms.edgechromium", "webview.platforms.winforms"])
 
-EXCLUDE = ["tkinter", "matplotlib", "numpy", "pytest", "PyInstaller", "pymupdf", "fitz"]
+EXCLUDE = ["matplotlib", "numpy", "pytest", "PyInstaller", "pymupdf", "fitz"]
 
 
 def run_pyinstaller() -> None:
@@ -119,6 +128,8 @@ def run_pyinstaller() -> None:
         args += ["--hidden-import", name]
     for name in EXCLUDE:
         args += ["--exclude-module", name]
+    for name in COLLECT_ALL:
+        args += ["--collect-all", name]
     args += ["--paths", str(ROOT)]
 
     print("Running PyInstaller — this takes a couple of minutes...\n")

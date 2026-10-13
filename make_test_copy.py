@@ -43,6 +43,9 @@ FILES = [
     "generation_log.py",                 # imported by the engine — omitting it
     "case_export.py",                    # broke the copy on the first import
     "housekeeping.py",                   # the worker's own data-hygiene command
+    # the Opt-out Assistant — optional, installs Playwright on first launch
+    "Start Opt-out Assistant.bat", "requirements-optout.txt",
+    "optout_assist.py", "optout_panel.py",
     # the client's own starting point
     "clients/_TEMPLATE.yaml",
 ]
@@ -166,6 +169,8 @@ WHAT IT DOES
 3. You import the county's list of that client's recorded documents, and it puts
    them on the Clerk form.
 4. It builds a spreadsheet of the opt-out sites with the values each one asks for.
+5. Its Opt-out Assistant fills in each site's opt-out form for you, in your own
+   web browser, and records what you did in that spreadsheet.
 
 There is a made-up sample client in the list so you can try it straight away.
 Delete it when you start entering real people.
@@ -185,6 +190,23 @@ Two things that will catch you out, both learned the hard way:
   recorded under the name they had at the time.
 
 
+THE OPT-OUT ASSISTANT
+---------------------
+Open a client, go to "Opt-out worklist" and press "Open the Opt-out Assistant".
+A small window opens beside a web browser (it needs Microsoft Edge or Google
+Chrome). Tick the sites to work through, and for each one:
+
+  1. In the browser, find the client's listing and make sure it really is them.
+  2. Press "Fill the form" — it types in the client's details.
+  3. Check every value, solve the CAPTCHA, and click the site's own Submit button.
+  4. Press "I clicked Submit" (or "They emailed a verification link"). That is
+     written into the worklist, with the date to re-check by.
+
+Some sites need the client themselves (a phone call, a text code, their own Google
+account); the window lists those first so you can arrange a time. Some show a
+"verify you are human" check — that is for you to click, not the tool.
+
+
 KEEPING A COPY
 --------------
 "Export case" on the Filled forms screen packages one client — their details,
@@ -198,7 +220,8 @@ WHAT IT DOES NOT DO — on purpose
 * It never submits anything. Every form is a draft for you to check, get
   notarised where the county requires it, and file yourself.
 * It never decides whether someone qualifies for an exemption. You set that.
-* It never sends the opt-out requests. Those sites need a person.
+* It never sends the opt-out requests. The Opt-out Assistant fills the forms,
+  but you check them and press Submit — it never clicks anything on a site.
 * It never decides which recorded documents are your client's. You tick those.
 
 
@@ -215,8 +238,12 @@ over time. To see what has accumulated, and clear out the old:
     python housekeeping.py              (shows what is there)
     python housekeeping.py --prune      (removes what is past its date)
 
-The one exception to nothing leaving this computer is the "Comment" button, which
-is there for you to send feedback about the app. It takes a picture of your
+The Opt-out Assistant types the client's details into the opt-out sites — that is
+the point of it — but only into the page in front of you, only when you press
+"Fill the form", and nothing goes to a site until you click its Submit button.
+
+The one other exception to nothing leaving this computer is the "Comment" button,
+which is there for you to send feedback about the app. It takes a picture of your
 screen, so use the "Hide" tool to black out anything that shouldn't be shared
 before you send it.
 

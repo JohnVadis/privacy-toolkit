@@ -30,6 +30,13 @@ There is nothing to install. No Python, no Terminal, no setup.
 - **output/** — filled forms land here
 - **forms/**, **sites.yaml** — the county forms and the opt-out list it works from
 
+## The Opt-out Assistant
+
+On a client's **Opt-out worklist** page, **Open the Opt-out Assistant** opens a small
+window that fills in each data broker's opt-out form for you — in Google Chrome or
+Microsoft Edge, so one of those needs to be installed. You check each form and click
+Submit yourself; it never submits anything.
+
 ## If it says the app is "damaged"
 
 It isn't. That is macOS reacting to a quarantine flag on a downloaded file. Open

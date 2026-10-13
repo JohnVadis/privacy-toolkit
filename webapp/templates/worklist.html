@@ -16,6 +16,26 @@
   creation and email verification, and each has its own terms of service. The toolkit fills in
   the values and tracks status; a person does the clicking and the submitting.</p>
 
+<fieldset>
+  <legend>Opt-out Assistant</legend>
+  <p>Opens a small window beside your web browser. It goes through the sites one by one,
+    fills in each opt-out form from this client's file, and records what you did in the
+    worklist. <strong>You</strong> check each form, solve the CAPTCHA and click Submit &mdash;
+    it never submits anything itself. Needs Microsoft Edge or Google Chrome.</p>
+  {% if assistant == "1" %}
+    <p class="note note-ok"><strong>Opening the Opt-out Assistant&hellip;</strong> Its window
+      appears in a few seconds. You can keep using this one.</p>
+  {% elif assistant == "0" %}
+    <p class="note note-warn"><strong>The Opt-out Assistant couldn't be started.</strong>
+      Close the toolkit and open it again, then try once more.</p>
+  {% endif %}
+  <form method="post" action="{{ url_for('optout_launch', slug=slug) }}">
+    <div class="actions-bar">
+      <button type="submit" class="primary">Open the Opt-out Assistant</button>
+    </div>
+  </form>
+</fieldset>
+
 {% if just_built %}
   <p class="note note-ok"><strong>Worklist built.</strong>
     Written to <span class="mono">{{ output_rel }}/{{ built }}</span>.
