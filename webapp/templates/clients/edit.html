@@ -4,26 +4,20 @@
 {% block title %}{{ 'New client' if is_new else (case.get('display_name') or slug) }} — Privacy Removal Toolkit{% endblock %}
 {% block content %}
 
-<div class="page-head">
-  <div>
-    <h1>{{ 'New client' if is_new else (case.get('display_name') or slug) }}</h1>
-    <p class="lede">
-      {% if is_new %}Entered once; every form and the worklist read from here.
-      {% else %}Saved to <span class="mono">clients/{{ slug }}.yaml</span> — the same file the CLI reads.
-      {% endif %}
-    </p>
+{% if is_new %}
+  <div class="page-head">
+    <div>
+      <h1>New client</h1>
+      <p class="lede">Enter their details once; every form and the opt-outs use them.</p>
+    </div>
   </div>
-  {% if not is_new %}
-    <a class="btn" href="{{ url_for('documents_page', slug=slug) }}">Documents</a>
-    <a class="btn" href="{{ url_for('client_files', slug=slug) }}">Filled forms</a>
-    <a class="btn" href="{{ url_for('generate_page', slug=slug) }}">Generate forms</a>
-  {% endif %}
-</div>
+{% else %}
+  {% set display_name = case.get('display_name') or slug %}
+  {% set tab = 'details' %}{% include "_client_tabs.html" %}
+{% endif %}
 
 {% if saved and not errors %}
-  <p class="note note-ok"><strong>Saved.</strong>
-    clients/{{ slug }}.yaml was written. <code class="mono">python fill_forms.py --client
-    clients/{{ slug }}.yaml</code> now produces the same PDFs this app does.</p>
+  <p class="note note-ok"><strong>Saved.</strong></p>
 {% endif %}
 
 {% if errors %}
@@ -36,7 +30,7 @@
 {% if warnings %}
   <div class="note note-warn">
     <strong>Worth a look — these won't block saving.</strong>
-    <ul>{% for w in warnings %}<li>{{ w.message }}</li>{% endfor %}</ul>
+    <ul>{% for w in warnings %}<li>{{ w.message | form_names }}</li>{% endfor %}</ul>
   </div>
 {% endif %}
 
@@ -53,7 +47,7 @@
                value="{{ case.get('display_name', '') }}" placeholder="Lastname, Firstname"
                autocomplete="off" {% if dn_errs %}aria-invalid="true"{% endif %}>
         {% for msg in dn_errs %}<p class="field-error">{{ msg }}</p>{% endfor %}
-        {% if not dn_errs %}<p class="hint">Names the output folder and every form title.</p>{% endif %}
+
       </div>
       <div class="field">
         <label for="case[case_number]">Case number</label>
@@ -100,7 +94,7 @@
           {% endfor %}
         </select>
         {% for msg in cat_errs %}<p class="field-error">{{ msg }}</p>{% endfor %}
-        {% if not cat_errs %}<p class="hint">Selects the checkbox on each form that has one.</p>{% endif %}
+
       </div>
       <div class="field">
         <label for="case[exemption][code]">Code</label>
@@ -151,7 +145,6 @@
     <span class="spacer"></span>
     {% if not is_new %}
       <a class="btn btn-danger-quiet" href="{{ url_for('client_delete_confirm', slug=slug) }}">Delete client</a>
-      <a class="btn" href="{{ url_for('generate_page', slug=slug) }}">Generate forms →</a>
     {% endif %}
   </div>
 </form>

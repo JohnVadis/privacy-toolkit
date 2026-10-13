@@ -159,7 +159,7 @@ In rough order of "most likely to be wrong":
 - [ ] The launcher opens at all (Gatekeeper, execute bit)
 - [ ] The environment builds — watch for a package that won't install
 - [ ] The app window opens, and isn't blank
-- [ ] The sample client's forms generate: **Generate forms** → all four
+- [ ] The sample client's forms generate: **Make forms** tab → all four
 - [ ] A generated PDF opens and looks right — values on their lines, boxes ticked
 - [ ] **Documents** → paste a few rows → the picker lists them
 - [ ] **Export case** downloads a zip

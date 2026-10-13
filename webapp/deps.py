@@ -63,6 +63,23 @@ def _template_url_for(context, name: str, **params) -> str:
 # Override Starlette's non-encoding default for every template.
 templates.env.globals["url_for"] = _template_url_for
 
+
+def form_names(text) -> str:
+    """Swap internal form keys ("hillsborough_clerk_redaction") in a message for the
+    form's own title — the engine's messages name forms the way its files do, and a
+    worker shouldn't have to read those."""
+    from fill_forms import list_mappings
+
+    text = str(text or "")
+    for m in list_mappings():
+        key, title = m.get("form_key"), m.get("title")
+        if key and title and key in text:
+            text = text.replace(key, title)
+    return text
+
+
+templates.env.filters["form_names"] = form_names
+
 # Client file stems. Permissive enough for a hand-named file like "Jane D",
 # strict enough to exclude separators, "..", and leading dots.
 SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,79}$")

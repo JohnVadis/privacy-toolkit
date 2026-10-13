@@ -247,6 +247,29 @@ class TestWorklist:
         assert "Rebuilding keeps everything you've filled in" in body
 
 
+class TestUncluttered:
+    """Workers read these pages, not developers: one set of tabs, no file paths,
+    no command lines, no internal form keys."""
+
+    PAGES = ["edit", "documents", "generate", "files", "worklist"]
+
+    @pytest.mark.parametrize("page", PAGES)
+    def test_every_client_page_has_the_same_tabs(self, app_client, example_client, page):
+        save_client("Tidy", example_client)
+        body = app_client.get(f"/clients/Tidy/{page}").text
+        for tab in ("Details", "Documents", "Make forms", "Filled forms", "Opt-outs"):
+            assert f">{tab}</a>" in body, (page, tab)
+        assert body.count('aria-current="page"') == 2      # menu + this tab
+
+    @pytest.mark.parametrize("page", PAGES)
+    def test_no_developer_jargon(self, app_client, example_client, page):
+        save_client("Tidy", example_client)
+        body = app_client.get(f"/clients/Tidy/{page}").text
+        for jargon in ("the CLI", "clients/Tidy.yaml", "fill_forms.py", ".yaml</span>",
+                       "hillsborough_clerk_redaction:", "home_full"):
+            assert jargon not in body, (page, jargon)
+
+
 class TestOptoutAssistant:
     def test_the_button_starts_it_for_this_client(self, app_client, example_client,
                                                    monkeypatch):

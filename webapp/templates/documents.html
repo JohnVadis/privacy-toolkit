@@ -2,23 +2,17 @@
 {% block title %}Documents — {{ display_name }}{% endblock %}
 {% block content %}
 
-<div class="page-head">
-  <div>
-    <h1>Documents to redact</h1>
-    <p class="lede">{{ display_name }} — the recorded documents the Clerk form names.
-      Import the results of an Official Records search, then check them.</p>
-  </div>
-  <a class="btn" href="{{ url_for('client_edit', slug=slug) }}">Edit client</a>
-  <a class="btn btn-primary" href="{{ url_for('generate_page', slug=slug) }}">Generate forms</a>
-</div>
+{% set tab = 'documents' %}{% include "_client_tabs.html" %}
+<p class="lede">The recorded documents the Clerk form names. Import the results of an
+  Official Records search, then tick the ones that are this client's.</p>
 
 {% if done %}<div class="note note-ok"><strong>Saved.</strong> {{ done }}.</div>{% endif %}
 {% if error %}<div class="note note-error"><strong>Nothing was imported.</strong> {{ error }}</div>{% endif %}
 
 {% if warnings %}
   <div class="note note-warn">
-    <strong>Worth knowing before you generate.</strong>
-    <ul>{% for w in warnings %}<li>{{ w.message }}</li>{% endfor %}</ul>
+    <strong>Worth knowing.</strong>
+    <ul>{% for w in warnings %}<li>{{ w.message | form_names }}</li>{% endfor %}</ul>
   </div>
 {% endif %}
 
@@ -99,13 +93,15 @@
 
 <div class="card">
   <h2>Import a record list</h2>
-  <p class="hint">
-    A CSV from the Clerk's Official Records search, or the results grid copied and
-    pasted. The first row must be the column headings — <span class="mono">Instrument
-    Number</span>, <span class="mono">Book</span>, <span class="mono">Page</span>,
-    <span class="mono">Document Title</span>, and common variants (CFN, OR Book, Doc
-    Type) are understood. Nothing is sent anywhere; the file is read on this computer.
-  </p>
+  <p class="hint">The CSV from the Clerk's Official Records search, or its results grid
+    copied and pasted. It's read on this computer only.</p>
+  <details class="more">
+    <summary>Which columns does it understand?</summary>
+    <p class="hint">The first row must be the column headings: <span class="mono">Instrument
+      Number</span>, <span class="mono">Book</span>, <span class="mono">Page</span> and
+      <span class="mono">Document Title</span>, or common variants such as CFN, OR Book and
+      Doc Type.</p>
+  </details>
   <form method="post" action="{{ url_for('documents_import', slug=slug) }}"
         enctype="multipart/form-data">
     <label for="doc-file">CSV file</label>
@@ -148,7 +144,7 @@
   {% if capacities %}
     {% for c in capacities %}
       <p class="hint">
-        {{ c.form_key.replace('_', ' ') }} prints
+        {{ c.form_key | form_names }} prints
         {%- for t in c.tables %}
           {{ ' ' }}{{ t.rows }} {{ t.list }} row{{ '' if t.rows == 1 else 's' }}
           (the rest on Attachment {{ t.attachment }}){{ ', and' if not loop.last }}

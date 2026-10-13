@@ -1,0 +1,18 @@
+{#- One header for every page about a client: their name and the same five tabs,
+    in place of a different cluster of buttons on each page. Set `tab` before
+    including; `display_name` and `slug` come from the page. -#}
+<div class="client-head">
+  <p class="crumb"><a href="{{ url_for('client_list') }}">Clients</a> /</p>
+  <h1>{{ display_name }}</h1>
+  <nav class="tabs" aria-label="This client">
+    {% for key, label, route in [
+         ('details',   'Details',      'client_edit'),
+         ('documents', 'Documents',    'documents_page'),
+         ('generate',  'Make forms',   'generate_page'),
+         ('files',     'Filled forms', 'client_files'),
+         ('optouts',   'Opt-outs',     'worklist_page')] %}
+      <a href="{{ url_for(route, slug=slug) }}"
+         {% if tab == key %}aria-current="page"{% endif %}>{{ label }}</a>
+    {% endfor %}
+  </nav>
+</div>

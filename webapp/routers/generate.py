@@ -53,6 +53,8 @@ def _picker_context(request: Request, slug: str, client: dict, **extra) -> dict:
         "display_name": (client.get("case") or {}).get("display_name") or slug,
         "people": _people(client),
         "forms": _available_forms(),
+        # Shown instead of internal form keys once forms are made.
+        "titles": {m["form_key"]: m.get("title") or "" for m in list_mappings()},
         "output_rel": f"output/{output_dir(client).name}",
         "failure": "",
     }

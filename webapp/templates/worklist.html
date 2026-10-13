@@ -1,124 +1,92 @@
 {% extends "base.html" %}
-{% block title %}Opt-out worklist — {{ display_name }}{% endblock %}
+{% block title %}Opt-outs — {{ display_name }}{% endblock %}
 {% block content %}
+{% set tab = 'optouts' %}{% include "_client_tabs.html" %}
 
-<div class="page-head">
-  <div>
-    <h1>Opt-out worklist</h1>
-    <p class="lede">{{ display_name }} — a spreadsheet pre-filled with the values each site asks
-      for, plus status columns to track the work.</p>
-  </div>
-  <a class="btn" href="{{ url_for('client_files', slug=slug) }}">Filled forms</a>
-  <a class="btn" href="{{ url_for('generate_page', slug=slug) }}">Generate forms</a>
-</div>
+<p class="gate"><strong>Prepared, not submitted.</strong> The sites use CAPTCHAs and email
+  checks, so a person always does the clicking and the submitting.</p>
 
-<p class="gate"><strong>Prepared, not submitted.</strong> These sites use CAPTCHAs, account
-  creation and email verification, and each has its own terms of service. The toolkit fills in
-  the values and tracks status; a person does the clicking and the submitting.</p>
-
-<fieldset>
-  <legend>Opt-out Assistant</legend>
-  <p>Opens a small window beside your web browser. It goes through the sites one by one,
-    fills in each opt-out form from this client's file, and records what you did in the
-    worklist. <strong>You</strong> check each form, solve the CAPTCHA and click Submit &mdash;
-    it never submits anything itself. Needs Microsoft Edge or Google Chrome.</p>
-  {% if assistant == "1" %}
-    <p class="note note-ok"><strong>Opening the Opt-out Assistant&hellip;</strong> Its window
-      appears in a few seconds. You can keep using this one.</p>
-  {% elif assistant == "0" %}
-    <p class="note note-warn"><strong>The Opt-out Assistant couldn't be started.</strong>
-      Close the toolkit and open it again, then try once more.</p>
-  {% endif %}
-  <form method="post" action="{{ url_for('optout_launch', slug=slug) }}">
-    <div class="actions-bar">
-      <button type="submit" class="primary">Open the Opt-out Assistant</button>
-    </div>
-  </form>
-</fieldset>
+{% if assistant == "1" %}
+  <p class="note note-ok"><strong>Opening the Opt-out Assistant&hellip;</strong> Its window
+    appears in a few seconds. You can keep using this one.</p>
+{% elif assistant == "0" %}
+  <p class="note note-warn"><strong>The Opt-out Assistant couldn't be started.</strong>
+    Close the toolkit and open it again, then try once more.</p>
+{% endif %}
 
 {% if just_built %}
   <p class="note note-ok"><strong>Worklist built.</strong>
-    Written to <span class="mono">{{ output_rel }}/{{ built }}</span>.
-    {% if stats.preserved %}
-      Kept the tracked status of <strong>{{ stats.preserved }}</strong> site(s) you had
-      already worked.
-    {% endif %}
-    {% if stats.carried_over %}
-      <strong>{{ stats.carried_over }}</strong> row(s) were kept for sites no longer in
-      the catalog, so their submissions stay on the record.
-    {% endif %}
-    {% if stats.backup %}
-      The previous version was copied to
-      <span class="mono">{{ output_rel }}/_worklist_backups/</span>.
-    {% endif %}</p>
+    {% if stats.preserved %}Kept what you'd recorded for {{ stats.preserved }} site(s).{% endif %}
+    {% if stats.carried_over %}{{ stats.carried_over }} row(s) for sites no longer on the list
+      were kept too.{% endif %}
+    {% if stats.backup %}The previous version was backed up first.{% endif %}</p>
 {% endif %}
 
-{% if built and not just_built %}
-  <p class="note note-warn"><strong>You already have a worklist for this client.</strong>
-    Rebuilding keeps everything you've filled in — Status, Submitted, Confirmation,
-    Verify&nbsp;by and your Notes are carried across, and the old file is backed up
-    first. Only the site list and pre-filled values are refreshed.</p>
-{% endif %}
+<div class="card">
+  <h2 style="margin-top:0">Opt-out Assistant</h2>
+  <p>Goes through the sites one by one in your web browser (Chrome or Edge), fills in each
+    opt-out form from this client's details, and records what you did. You check each form
+    and click Submit yourself.</p>
+  <form method="post" action="{{ url_for('optout_launch', slug=slug) }}">
+    <button type="submit" class="primary">Open the Opt-out Assistant</button>
+  </form>
+</div>
 
-<form method="post" action="{{ url_for('worklist_run', slug=slug) }}">
-  <fieldset>
-    <legend>Build</legend>
-    <div class="grid two">
-      <div class="field">
-        <label for="person">Pre-fill values for</label>
-        <select id="person" name="person">
+<div class="card">
+  <h2 style="margin-top:0">Worklist spreadsheet</h2>
+  <p>Every site with this client's details ready to copy, plus columns to track progress.
+    {% if built %}Rebuilding keeps everything you've filled in.{% endif %}</p>
+  <form method="post" action="{{ url_for('worklist_run', slug=slug) }}">
+    <div class="section-actions">
+      {% if people | length > 1 %}
+        <label for="person" style="margin:0">Details of</label>
+        <select id="person" name="person" style="width:auto">
           {% for p in people %}
             <option value="{{ p.role }}" {% if person == p.role %}selected{% endif %}>
               {{ p.name }} ({{ p.role.replace('_', ' ') }})</option>
           {% endfor %}
         </select>
-        <p class="hint">Sites ask for one person's details at a time.</p>
-      </div>
-    </div>
-    <div class="actions-bar">
-      <button type="submit" class="primary">{{ 'Rebuild worklist' if built else 'Build worklist' }}</button>
+      {% elif people %}
+        <input type="hidden" name="person" value="{{ people[0].role }}">
+      {% endif %}
+      <button type="submit" class="{{ '' if built else 'primary' }}">
+        {{ 'Rebuild worklist' if built else 'Build worklist' }}</button>
       {% if built %}
         <a class="btn" href="{{ url_for('download_file', slug=slug, filename=built) }}" download>
-          Download .xlsx</a>
+          Download spreadsheet</a>
       {% endif %}
     </div>
-  </fieldset>
-</form>
-
-<h2>Sites in the catalog</h2>
-<p class="lede">Read-only view of <span class="mono">sites.yaml</span>. Edit that file to change
-  what lands in the spreadsheet.</p>
-
-<div class="table-wrap">
-  <table>
-    <thead>
-      <tr>
-        <th scope="col">Site</th>
-        <th scope="col">Category</th>
-        <th scope="col">Values it asks for</th>
-        <th scope="col">Agent OK?</th>
-        <th scope="col">Notes</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for s in sites %}
-      <tr>
-        <td>
-          <strong>{{ s.get('name') or s.get('key') }}</strong><br>
-          {# Opened by the worker, deliberately. The app never requests these itself. #}
-          <a class="muted mono" href="{{ s.get('opt_out_url') }}"
-             target="_blank" rel="noopener noreferrer external">{{ s.get('opt_out_url') }}</a>
-        </td>
-        <td>{{ (s.get('category') or '').replace('_', ' ') }}</td>
-        <td>
-          {% for n in s.get('needs') or [] %}<span class="tag tag-var">{{ n }}</span>{% endfor %}
-        </td>
-        <td>{{ 'yes' if s.get('supports_agent') else 'no' }}</td>
-        <td class="muted">{{ s.get('notes') or '' }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  </form>
 </div>
+
+<details class="more">
+  <summary>See all {{ sites | length }} sites</summary>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Site</th>
+          <th scope="col">Type</th>
+          <th scope="col">What to know</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in sites %}
+        <tr>
+          <td>
+            {# Opened by the worker, deliberately. The app never requests these itself. #}
+            <a href="{{ s.get('opt_out_url') }}" target="_blank"
+               rel="noopener noreferrer external"><strong>{{ s.get('name') or s.get('key') }}</strong></a>
+          </td>
+          <td class="muted">{{ (s.get('category') or '').replace('_', ' ') }}</td>
+          <td class="muted">
+            {% if s.get('client_needed') %}<strong>Needs the client:</strong>
+              {{ s.get('client_needed') }} {% endif %}{{ s.get('notes') or '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</details>
 
 {% endblock %}

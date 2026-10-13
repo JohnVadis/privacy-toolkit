@@ -53,7 +53,7 @@
       <input type="date" id="{{ base }}[dob]" name="{{ base }}[dob]" value="{{ p.get('dob', '') }}"
              {% if dob_errs %}aria-invalid="true"{% endif %}>
       {% for msg in dob_errs %}<p class="field-error">{{ msg }}</p>{% endfor %}
-      {% if not dob_errs %}<p class="hint">Stored as YYYY-MM-DD; forms render MM/DD/YYYY.</p>{% endif %}
+
     </div>
   </div>
 

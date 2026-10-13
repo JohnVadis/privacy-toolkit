@@ -192,7 +192,7 @@ Two things that will catch you out, both learned the hard way:
 
 THE OPT-OUT ASSISTANT
 ---------------------
-Open a client, go to "Opt-out worklist" and press "Open the Opt-out Assistant".
+Open a client, go to the "Opt-outs" tab and press "Open the Opt-out Assistant".
 A small window opens beside a web browser (it needs Microsoft Edge or Google
 Chrome). Tick the sites to work through, and for each one:
 

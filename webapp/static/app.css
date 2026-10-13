@@ -77,6 +77,27 @@ a { color: var(--accent); }
 .page-head > div:first-child { flex: 1 1 20rem; }
 .page-head .lede { margin-bottom: 0; }
 
+/* One header for every client page: name, then tabs — not a button cluster per page. */
+.client-head { margin-bottom: 1.5rem; }
+.client-head .crumb { margin: 0 0 0.15rem; font-size: 0.85rem; color: var(--text-dim); }
+.client-head .crumb a { color: var(--text-dim); text-decoration: none; }
+.client-head .crumb a:hover { color: var(--text); }
+.client-head h1 { margin-bottom: 0.75rem; }
+.tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.tabs a {
+  padding: 0.5rem 0.9rem; color: var(--text-dim); text-decoration: none;
+  border-bottom: 2px solid transparent; margin-bottom: -1px; font-weight: 550;
+}
+.tabs a:hover { color: var(--text); }
+.tabs a[aria-current="page"] { color: var(--text); border-bottom-color: var(--accent); }
+.section-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin: 0 0 1rem; }
+.section-actions .spacer { flex: 1; }
+
+.site-footer { max-width: 68rem; margin: 2rem auto 0; padding: 1rem 1.5rem 2rem;
+  font-size: 0.82rem; color: var(--text-dim); border-top: 1px solid var(--border); }
+.site-footer a { color: var(--text-dim); }
+details.more > summary { cursor: pointer; color: var(--accent); font-weight: 550; margin: 0.5rem 0; }
+
 /* ---------- surfaces ---------- */
 .card {
   background: var(--surface);

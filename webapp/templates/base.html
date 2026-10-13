@@ -18,7 +18,6 @@
         <small>Hillsborough County, FL</small></a>
       <nav>
         <a href="{{ url_for('client_list') }}" {% if nav == 'clients' %}aria-current="page"{% endif %}>Clients</a>
-        <a href="{{ url_for('forms_overview') }}" {% if nav == 'forms' %}aria-current="page"{% endif %}>Forms</a>
         <a href="{{ url_for('feedback_page') }}" id="comment-link"
            title="Take a picture of this screen and send a comment">Comment</a>
       </nav>
@@ -27,6 +26,12 @@
   <main>
     {% block content %}{% endblock %}
   </main>
+  {#- The form set-up tools are for whoever maps a new county form — rarely needed,
+      so they live down here rather than in the menu everyone uses. -#}
+  <footer class="site-footer">
+    This tool prepares paperwork only — a person checks, signs and submits everything.
+    <span style="float:right"><a href="{{ url_for('forms_overview') }}">Form set-up</a></span>
+  </footer>
   <script>
     /* Capture the screen you are ON, before navigating to the comment page. */
     (function () {
