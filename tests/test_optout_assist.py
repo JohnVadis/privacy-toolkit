@@ -428,56 +428,70 @@ class TestSession:
         assert "(primary): submitted" in tracked["spokeo"]["Notes"]
 
 
+# Runs in a CHILD process. Tk objects must be created and destroyed on one thread,
+# and in the pytest process some were garbage-collected later on a web-app test's
+# worker thread: a warning on Windows, an abort of the whole run on macOS.
+WINDOW_WALK = r"""
+import sys
+import tkinter
+import optout_assist as OA
+import optout_panel as OP
+import build_worklist as BW
+from client_context import client_path, load_client
+
 class FakeBrowser:
     def __init__(self, *a, **k):
         self.opened = []
-
     def open(self, url):
         self.opened.append(url)
         return True
-
     def current_page(self):
         return None
-
     def close(self):
         pass
 
+OP.Browser = FakeBrowser
+try:
+    app = OP.App()
+except tkinter.TclError:
+    print("SKIP no display")
+    sys.exit(0)
+try:
+    assert [c["slug"] for c in app.clients] == ["Example Client"], app.clients
+    ticked = [s["key"] for s, var, _ in app.site_vars if var.get()]
+    assert len(ticked) == len(BW.load_sites())          # nothing worked yet
+    for _site, var, _status in app.site_vars:
+        var.set(False)
+    app.site_vars[0][1].set(True)
+    app.start()
+    assert app.browser.opened == [app.site_vars[0][0]["opt_out_url"]]
+    app.fill()                                          # no tab: says so, no crash
+    assert "browser is closed" in app.result.cget("text")
+    app.ref.insert(0, "ABC")
+    app.done("submitted")
+    assert app.session.finished
+    assert app.session.outcomes[0][1] == "submitted"
+    key = app.site_vars[0][0]["key"]
+    client = load_client(client_path("Example Client"))
+    assert OA.site_status(client)[key] == "submitted"
+finally:
+    app.quit()
+print("OK")
+"""
 
-def test_window_walks_setup_site_and_summary(saved_client, monkeypatch):
-    tkinter = pytest.importorskip("tkinter")
-    import optout_panel as OP
 
-    monkeypatch.setattr(OP, "Browser", FakeBrowser)
-    try:
-        app = OP.App()
-    except tkinter.TclError:
+def test_window_walks_setup_site_and_summary(saved_client):
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    pytest.importorskip("tkinter")
+    repo = Path(__file__).resolve().parent.parent
+    run = subprocess.run([sys.executable, "-c", WINDOW_WALK], cwd=repo,
+                         capture_output=True, text=True, timeout=120)
+    if "SKIP no display" in run.stdout:
         pytest.skip("no display")
-    try:
-        assert [c["slug"] for c in app.clients] == ["Example Client"]
-        ticked = [s["key"] for s, var, _ in app.site_vars if var.get()]
-        assert len(ticked) == len(BW.load_sites())          # nothing worked yet
-        for _site, var, _status in app.site_vars:
-            var.set(False)
-        app.site_vars[0][1].set(True)
-        app.start()
-        assert app.browser.opened == [app.site_vars[0][0]["opt_out_url"]]
-        app.fill()                                          # no tab: says so, no crash
-        assert "browser is closed" in app.result.cget("text")
-        app.ref.insert(0, "ABC")
-        app.done("submitted")
-        assert app.session.finished
-        assert app.session.outcomes[0][1] == "submitted"
-        key = app.site_vars[0][0]["key"]
-        assert OA.site_status(saved_client)[key] == "submitted"
-    finally:
-        app.quit()
-        # Drop every Tk variable HERE, on the main thread. Left to the garbage
-        # collector, one is finalised later on a web-app test's worker thread, which
-        # Tcl doesn't allow — at best a warning, at worst the run crashes.
-        import gc
-        app.site_vars = app.session = None
-        del app
-        gc.collect()
+    assert run.returncode == 0 and "OK" in run.stdout, run.stdout + run.stderr
 
 
 def test_catalog_is_well_formed():
