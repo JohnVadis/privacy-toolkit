@@ -15,6 +15,10 @@ pypdf==6.19.0
 PyYAML==6.0.3
 openpyxl==3.1.5
 pdfplumber==0.11.10        # overlay anchors (pdf_overlay.py)
+# A pdfplumber dependency, pinned because it broke a build: 50.0.2's Intel-Mac wheel
+# can't load once frozen ("Symbol not found: _SSL_get0_group_name"), so the Intel
+# app couldn't start at all. 50.0.1 is what the working V3 build shipped.
+cryptography==50.0.1
 reportlab==5.0.1           # overlay stamping (pdf_overlay.py)
 
 # Local web UI (webapp/) — binds to 127.0.0.1, no outbound calls.
