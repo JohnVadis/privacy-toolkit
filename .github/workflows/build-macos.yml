@@ -51,10 +51,13 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          # --only-binary: a cryptography compiled here links Homebrew's OpenSSL and
+          # the app dies on launch; better the install fails loudly than ship that.
+          pip install --only-binary cryptography -r requirements.txt
           # The Opt-out Assistant ships inside the app (started with --optout).
           pip install -r requirements-optout.txt
           pip install pyinstaller
+          pip show cryptography pyinstaller | grep -E '^(Name|Version):'
 
       - name: Run the tests first
         # No point shipping an app whose engine is broken. The golden test skips
