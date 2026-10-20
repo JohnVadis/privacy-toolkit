@@ -22,7 +22,9 @@ import sys
 from dataclasses import dataclass, field as _field
 
 from client_context import build_context, list_clients, load_client
-from fill_forms import CATEGORIES, form_key_for, list_mappings, load_mapping
+import counties
+from fill_forms import (CATEGORIES, form_key_for, forms_for_client, list_mappings,
+                        load_mapping)
 
 ROLES = ("primary", "spouse", "child", "dependent")
 
@@ -78,18 +80,23 @@ def mapping_variables(mapping: dict) -> set[str]:
     return names
 
 
-def _selected_mappings(form_keys=None) -> list[dict]:
+def _selected_mappings(form_keys=None, client=None) -> list[dict]:
     rows = [m for m in list_mappings() if not m["error"]]
     if form_keys:
         wanted = set(form_keys)
         rows = [m for m in rows if m["form_key"] in wanted]
+    elif client is not None:
+        # Nothing chosen means the client's own county's forms (what would be
+        # filled), so a Pinellas client isn't warned about Hillsborough's.
+        rows = forms_for_client(client, rows)
     return rows
 
 
 def validate_client(client: dict, form_keys=None) -> list[Issue]:
     """Return every issue found. Empty list (or warnings only) means safe to generate.
 
-    form_keys: restrict form-specific checks to those forms. None = every mapping.
+    form_keys: restrict form-specific checks to those forms. None = the forms for the
+               client's county plus the statewide ones.
     """
     issues: list[Issue] = []
     case = client.get("case") or {}
@@ -152,6 +159,14 @@ def validate_client(client: dict, form_keys=None) -> list[Issue]:
             issues.append(Issue(f"persons.{i}.addresses.{ri}.county",
                                 f"{who}: residence county is required — Clerk and Property "
                                 "Appraiser forms are county-level.", label="County"))
+        elif not counties.is_known(home.get("county")):
+            near = counties.suggestion(home.get("county"))
+            hint = f" Did you mean {near}?" if near else ""
+            issues.append(Issue(f"persons.{i}.addresses.{ri}.county",
+                                f"{who}: '{home.get('county')}' isn't a Florida county.{hint} "
+                                "Forms are matched to clients by county, so only the "
+                                "statewide forms will be offered.",
+                                severity="warning", label="County"))
         for key, label in (("line1", "Street address"), ("city", "City"),
                            ("state", "State"), ("zip", "ZIP")):
             if not str(home.get(key) or "").strip():
@@ -160,7 +175,7 @@ def validate_client(client: dict, form_keys=None) -> list[Issue]:
                                     severity="warning", label=label))
 
     # ---- exemption category, only when a chosen form actually uses it ----
-    mappings = _selected_mappings(form_keys)
+    mappings = _selected_mappings(form_keys, client)
     category_forms = [m["form_key"] for m in mappings if m["categories"]]
     category = str(exm.get("category") or "").strip()
     if category_forms:

@@ -30,6 +30,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from fill_forms import shipped_form_keys
 from paths import ROOT
 
 APP_NAME = "Privacy Toolkit"
@@ -63,12 +64,9 @@ BUNDLED_DATA = [
 
 # Shipped beside the executable: the user edits these.
 BESIDE = ["sites.yaml", "clients/_TEMPLATE.yaml"]
-FORM_KEYS = [
-    "hillsborough_clerk_redaction",
-    "hillsborough_appraiser_confidentiality",
-    "hillsborough_appraiser_military",
-    "fl_dos_public_records_exemption",
-]
+# Every real form whose blank PDF is in the repo (fill_forms.shipped_form_keys), so
+# a new county's form ships with no edit here.
+FORM_KEYS = shipped_form_keys()
 
 # Imported dynamically or late, so PyInstaller can't see them by itself.
 HIDDEN = [
@@ -76,7 +74,7 @@ HIDDEN = [
     "webapp.model", "webapp.formparse",
     "webapp.routers.clients", "webapp.routers.generate",
     "webapp.routers.corrections", "webapp.routers.forms", "webapp.routers.feedback",
-    "webapp.routers.documents",
+    "webapp.routers.documents", "webapp.routers.sites", "sites_edit", "counties",
     "uvicorn.logging", "uvicorn.loops.auto", "uvicorn.protocols.http.auto",
     "uvicorn.protocols.websockets.auto", "uvicorn.lifespan.on",
     "pypdfium2", "pdfplumber", "reportlab.pdfgen.canvas", "openpyxl",

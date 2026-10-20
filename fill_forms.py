@@ -26,6 +26,7 @@ from pathlib import Path
 
 import yaml
 
+import counties
 import documents
 import generation_log
 import pdf_attachment
@@ -84,6 +85,78 @@ def list_mappings() -> list[dict]:
             "tables": [t for t in (m.get("tables") or []) if isinstance(t, dict)],
         })
     return out
+
+
+def is_demo(mapping: dict) -> bool:
+    """The example form that ships to show how mapping works — never a real filing."""
+    return str(mapping.get("county") or "").strip().lower() in ("(demo)", "demo")
+
+
+def client_county(client: dict, person=None) -> str:
+    """The county of the person's residence, spelled the way forms spell it."""
+    try:
+        return counties.normalise(build_context(client, person).get("home_county", ""))
+    except Exception:
+        return ""
+
+
+def applies_to(mapping: dict, county: str) -> bool:
+    """True when a form is for this county, or for everyone in the state."""
+    if mapping.get("error") or is_demo(mapping):
+        return False
+    form_county = counties.normalise(mapping.get("county") or "", form=True)
+    return form_county == counties.STATEWIDE or counties.same(form_county, county)
+
+
+def forms_for_client(client: dict, mappings=None, person=None) -> list[dict]:
+    """The forms a client should get: their county's, plus the statewide ones.
+
+    This is the whole of county routing. A new county needs no code: a mapping with
+    `county: Pinellas` reaches every client whose residence is in Pinellas.
+    """
+    county = client_county(client, person)
+    rows = list_mappings() if mappings is None else mappings
+    return [m for m in rows if applies_to(m, county)]
+
+
+def shipped_form_keys() -> list[str]:
+    """The forms a packaged copy carries: every real mapping whose blank PDF is here.
+
+    Found, not listed, so a new county's form ships the moment its mapping and PDF
+    are in the repo. Left out: the demo form, and any form whose PDF git ignores (a
+    scratch upload, or a client's own paperwork, which .gitignore keeps out of
+    forms/_blank_pdfs/ on purpose). So a new county's blank PDF is shipped once it
+    is added to .gitignore's list of real forms — the one deliberate step.
+    """
+    import subprocess
+
+    keys, pdfs = [], {}
+    for m in list_mappings():
+        if m["error"] or is_demo(m) or not m["pdf_present"]:
+            continue
+        keys.append(m["form_key"])
+        pdfs[m["form_key"]] = str(m["pdf"]).replace("\\", "/")
+    try:
+        # Asked of the repo the code lives in, by the mapping's relative path, so it
+        # answers the same for the real folder and for the test sandbox.
+        ignored = subprocess.run(["git", "check-ignore", "--stdin"],
+                                 cwd=Path(__file__).resolve().parent,
+                                 # Bytes, not text: in text mode Windows sends "\r\n"
+                                 # and git reads the "\r" as part of the path.
+                                 input="".join(f"{p}\n" for p in pdfs.values()).encode(),
+                                 capture_output=True, timeout=30)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError("packaging needs git, to tell real forms from scratch "
+                           f"uploads ({exc})") from exc
+    # 0: some are ignored, 1: none are. Anything else (not a repo) is an unknown, and
+    # shipping every PDF in the folder could ship a client's own paperwork.
+    if ignored.returncode not in (0, 1):
+        raise RuntimeError("packaging must run inside the git checkout, to tell real "
+                           "forms from scratch uploads: "
+                           + ignored.stderr.decode("utf-8", "replace").strip())
+    out = ignored.stdout.decode("utf-8", "replace")
+    skip = {line.strip() for line in out.splitlines() if line.strip()}
+    return [k for k in keys if pdfs[k] not in skip]
 
 
 def _county_guess(form_key: str) -> str:
@@ -580,13 +653,20 @@ def fill_client(client: dict, persons=None, form_keys=None, report=print) -> lis
     """Fill the chosen forms for the chosen persons. The one entry point both UIs use.
 
     persons:   list of role strings, or [None] for "the default (first) person".
-    form_keys: list of form_key strings, or None for every mapping.
+    form_keys: list of form_key strings, or None for the forms for the client's
+               county plus the statewide ones (forms_for_client).
     """
     mappings = mapping_paths()
     if not mappings:
         raise ClientDataError("no mappings in forms/mappings/ — run scaffold_mapping.py first")
     if not persons:
         persons = [None]
+    if not form_keys:
+        form_keys = [m["form_key"] for m in forms_for_client(client)]
+        if not form_keys:
+            county = client_county(client) or "no county"
+            raise ClientDataError(f"no forms are set up for {county} yet — add one on "
+                                  "Form set-up, or name the forms to fill")
 
     made = []
     for person in persons:
@@ -605,7 +685,8 @@ def main():
     ap.add_argument("--person", help="person role to use (default: first/primary)")
     ap.add_argument("--all-persons", action="store_true",
                     help="fill for every person in the client file")
-    ap.add_argument("--forms", nargs="*", help="only these form_keys (default: all)")
+    ap.add_argument("--forms", nargs="*", help="only these form_keys (default: the client's county's forms "
+                         "plus the statewide ones)")
     args = ap.parse_args()
 
     try:

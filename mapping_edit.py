@@ -80,13 +80,23 @@ def check_mapping(text: str, expect_key: str | None = None) -> tuple[dict | None
 
     if mode == "overlay":
         entries = data.get("entries")
-        if not isinstance(entries, list) or not entries:
+        # An empty list is allowed: a scanned form starts with nothing found, and
+        # the visual editor is where its values get placed. Refusing it left no way
+        # to get a scanned form into the editor at all.
+        if entries is None:
+            entries = []
+        if not isinstance(entries, list):
             problems.append("An overlay mapping needs a list of entries.")
         else:
             problems += _check_entries(entries, pdf)
     else:
         if not isinstance(data.get("fields"), dict):
             problems.append("A fillable mapping needs a fields: block.")
+        elif pdf and resolve(pdf).is_file():
+            missing = field_coverage(data)["missing"]
+            for name in missing[:10]:
+                problems.append(f"The PDF has no box called '{name}' — check the spelling, "
+                                "or that this is the right PDF.")
 
     if "tables" in data:
         if mode != "overlay":
@@ -94,6 +104,38 @@ def check_mapping(text: str, expect_key: str | None = None) -> tuple[dict | None
         problems += _check_tables(data.get("tables"), pdf)
 
     return data, problems
+
+
+def field_coverage(data: dict) -> dict:
+    """For a fillable mapping: which of the PDF's boxes get nothing.
+
+    `blank` are boxes the PDF has that the mapping never fills — absent from it, or
+    an empty literal (what the importer writes for a box it couldn't recognise).
+    `missing` are names the mapping uses that the PDF doesn't have, which the engine
+    would skip without a word. Overlay forms have no named boxes: both are empty.
+    """
+    out = {"blank": [], "missing": [], "total": 0}
+    if (data or {}).get("mode", "fillable") != "fillable":
+        return out
+    pdf = data.get("pdf")
+    fields = data.get("fields") if isinstance(data.get("fields"), dict) else {}
+    try:
+        import pdf_fill
+        on_pdf = pdf_fill.list_fields(str(resolve(pdf))) if pdf else []
+    except Exception:
+        return out
+    names = {f["id"] for f in on_pdf}
+    out["total"] = len(on_pdf)
+    for f in on_pdf:
+        rule = fields.get(f["id"])
+        if f["type"] == "checkbox":
+            if rule is None:
+                out["blank"].append(f["id"])
+            continue
+        if not isinstance(rule, dict) or not (rule.get("from") or rule.get("literal")):
+            out["blank"].append(f["id"])
+    out["missing"] = [k for k in fields if k not in names]
+    return out
 
 
 def _check_tables(tables, pdf) -> list[str]:

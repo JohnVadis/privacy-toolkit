@@ -39,7 +39,8 @@
       {% set county_errs = field_errors.get(path ~ ".county", []) %}
       <label for="{{ base }}[county]">County</label>
       <input type="text" id="{{ base }}[county]" name="{{ base }}[county]" value="{{ a.get('county', '') }}"
-             autocomplete="off" {% if county_errs %}aria-invalid="true"{% endif %}>
+             autocomplete="off" list="florida-counties" placeholder="Type or pick"
+             {% if county_errs %}aria-invalid="true"{% endif %}>
       {% for msg in county_errs %}<p class="field-error">{{ msg }}</p>{% endfor %}
     </div>
     <div class="field">

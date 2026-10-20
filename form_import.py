@@ -29,27 +29,45 @@ import pdf_fill
 from paths import resolve
 
 # field/label wording -> client variable. First match wins, so the specific
-# patterns come before the general ones.
+# patterns come before the general ones. A rule whose variable is "" STOPS the
+# search: the box is recognised as someone else's (an agent's, an agency's) and is
+# left blank rather than falling through to a client rule further down.
 VARIABLE_HINTS: list[tuple[str, str]] = [
-    (r"date\s*of\s*birth|\bd\.?o\.?b\b|birth\s*date", "dob"),
-    (r"first\s*name|given\s*name", "first_name"),
-    (r"middle\s*(name|initial)", "middle_name"),
-    (r"last\s*name|surname|family\s*name", "last_name"),
+    (r"date\s*of\s*birth|\bd\.?o\.?b\b|birth\s*date|birthdate", "dob"),
+    # The agent has a name and an email in the client file — nothing else. "Agent
+    # First Name" or "Agent Phone" must not get the client's.
+    (r"agent.*e[-\s]?mail|e[-\s]?mail.*agent", "agent_email"),
+    (r"^(name\s*of\s*)?agent(\s*full)?(\s*name)?$|^agent\s*name|name\s*of\s*agent", "agent_name"),
+    (r"agent|representative|preparer|supervisor|officer", ""),
+    # The agency the client works for has a name in the file; its address and phone
+    # are not the client's.
+    (r"employing\s*agency|^(agency|employer)(\s*name)?$|(agency|employer)\s*name", "employing_agency"),
+    (r"agency|employer|employment|department", ""),
+    # A box asking for more than one thing ("City/State/ZIP") is left for a person.
+    (r"city\W*(state|zip)|state\W*zip", ""),
+    (r"first\s*name|given\s*name|\bf\s?name\b|^first$", "first_name"),
+    (r"middle\s*(name|initial)|\bm\s?name\b|^middle$", "middle_name"),
+    (r"last\s*name|surname|family\s*name|\bl\s?name\b|^last$", "last_name"),
     (r"suffix", "suffix"),
     (r"owner\s*/?\s*relationship|relationship", "owner_relationship"),
-    (r"printed\s*name|full\s*name|name\s*of\s*(applicant|requestor)|^name$|^name\b", "full_name"),
-    (r"e-?mail", "email"),
-    (r"tele|phone|mobile|cell", "phone"),
+    (r"printed\s*name|full\s*name|name\s*of\s*(applicant|requestor|requester|owner|petitioner)"
+     r"|(applicant|requestor|requester|petitioner|owner|your|print)\s*name|^name$|^name\b",
+     "full_name"),
+    (r"e[-\s]?mail", "email"),
+    (r"tele|phone|mobile|\bcell\b|\btel\b|\bph\b", "phone"),
     (r"parcel|property\s*id|folio|strap", "home_parcel_id"),
-    (r"home\s*address|street\s*address|mailing\s*address|^address", "home_full"),
     (r"\bcounty\b", "home_county"),
-    (r"\bcity\b", "home_city"),
-    (r"\bstate\b", "home_state"),
-    (r"\bzip\b|postal", "home_zip"),
-    (r"job\s*title|position|rank", "job_title"),
-    (r"employing\s*agency|agency|employer|department", "employing_agency"),
-    (r"case\s*(number|no)", "case_number"),
-    (r"agent", "agent_name"),
+    (r"\bcity\b|\btown\b", "home_city"),
+    (r"\bstate\b|^st$", "home_state"),
+    (r"\bzip|postal", "home_zip"),
+    (r"address\s*(line\s*)?2|\bapt\b|apartment|suite|\bunit\b", "home_line2"),
+    # Street on its own; analyze() widens it to the full address when the form has
+    # no separate City box to carry the rest.
+    (r"street|address\s*(line\s*)?1|\baddr(ess)?\s*1\b", "home_line1"),
+    (r"home\s*address|mailing\s*address|residen(ce|tial)\s*address|physical\s*address"
+     r"|property\s*address|^address|^addr\b", "home_full"),
+    (r"job\s*title|position|rank|occupation", "job_title"),
+    (r"case\s*(number|no|num|#)|^case$", "case_number"),
     # Deliberately no rule for a bare "Date:". On these forms it is the date the
     # client signs in front of a notary, and pre-filling today's date onto a sworn
     # document would be wrong. It stays blank for a human.
@@ -60,17 +78,70 @@ SKIP_LABELS = re.compile(
     r"signature|notary|sworn|witness|commission|seal|initial|attn|fax|warning|note$|^date$",
     re.I)
 
+# A box about someone or something other than the client: filling it with the
+# client's own details would put the wrong person's name on a sworn form. Checked
+# against the WHOLE name, parents included ("Spouse[0].FirstName[0]"), and against
+# the tooltip — if either says it's someone else's, it is.
+NOT_THE_CLIENT = re.compile(
+    r"signature|notary|witness|spouse|husband|wife|child|dependent|minor|parent|guardian"
+    r"|mother|father|\bson\b|daughter|sibling|relative|co\s*applicant|joint|second|other"
+    r"|additional|seal|commission|official|office\s*use|clerk|deputy|staff|received"
+    r"|prior|previous|former|emergency|attorney|born|\b[2-9]\b", re.I)
+
+# "Address Line 2" and "Street 2" are the client's; "Owner 2" is someone else.
+_OWN_SECOND_LINE = re.compile(r"(address|addr|street|line)\s*2\b", re.I)
+
 LABEL_RE = re.compile(r"([A-Za-z][A-Za-z0-9 /()'\-\.]{2,44}):")
 
 
-def match_variable(name: str) -> str:
-    """Best-guess client variable for a field or label name. '' when unsure."""
-    text = re.sub(r"[_\-]+", " ", str(name or "")).strip().lower()
-    if not text:
+def _words(text: str) -> str:
+    text = re.sub(r"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", " ", text)  # camelCase
+    text = re.sub(r"[_\-#:.]+", " ", text)
+    text = re.sub(r"(?<=[A-Za-z])(?=\d)|(?<=\d)(?=[A-Za-z])", " ", text)
+    text = re.sub(r"^\s*(txt|fld|field|tb|text|input)\b\s*", "", text, flags=re.I)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def readable_name(name: str) -> str:
+    """A field name the way a person would say it.
+
+    PDF tools name boxes 'topmostSubform[0].Page1[0].txtFirstName[0]', 'Last_Name',
+    'ZipCode2'. Matching on that raw text missed most of them.
+    """
+    text = re.sub(r"\[\d+\]", "", str(name or ""))      # array indexes
+    if "." in text.strip("."):
+        text = text.strip(".").rsplit(".", 1)[-1]       # the box, not its parents
+    return _words(text)
+
+
+def _someone_else(text: str) -> bool:
+    # A tool's numbering ("Text3", "Page1.Field7") says nothing about whose box it
+    # is; only a number after a real word ("Owner 2") does.
+    text = re.sub(r"\b(text|field|fld|txt|page|form|subform|topmost)\s*\d+\b", " ", text, flags=re.I)
+    if re.fullmatch(r"[\d\s]*", text):
+        return False
+    return bool(NOT_THE_CLIENT.search(_OWN_SECOND_LINE.sub("", text)))
+
+
+def match_variable(name: str, label: str = "") -> str:
+    """Best-guess client variable for a field or label name. '' when unsure.
+
+    `label` is the box's tooltip, when the PDF has one. It is tried first, and if
+    either it or the box's full name (parents included) is about someone else, the
+    answer is '' — never a fall-through to whatever the other one says.
+    """
+    full = _words(re.sub(r"\[\d+\]", "", str(name or "")))
+    texts = [readable_name(label).lower() if label else "", readable_name(name).lower()]
+    if _someone_else(full) or any(_someone_else(t) for t in texts if t):
         return ""
-    for pattern, var in VARIABLE_HINTS:
-        if re.search(pattern, text):
-            return var
+    for text in texts:
+        if not text:
+            continue
+        for pattern, var in VARIABLE_HINTS:
+            if re.search(pattern, text):
+                if var:
+                    return var
+                return ""                          # someone else's: stop here
     return ""
 
 
@@ -94,7 +165,15 @@ def analyze(pdf_path) -> dict:
                 labels.extend(_labels_on_page(page, i, found))
     except Exception:
         pass
-    labels = _dedupe(labels)
+    unmatched_labels = []
+    for lab in labels:
+        if not lab["variable"] and lab["label"] not in unmatched_labels:
+            unmatched_labels.append(lab["label"])
+    labels = _dedupe([lab for lab in labels if lab["variable"]])
+    for f in fields:
+        f["variable"] = "" if f["type"] == "checkbox" else match_variable(
+            f["id"], f.get("label") or "")
+    _widen_street(fields, labels)
 
     return {
         "path": path,
@@ -104,6 +183,12 @@ def analyze(pdf_path) -> dict:
         "word_count": words,
         "image_only": words == 0,
         "labels": labels,
+        # Every box no client detail was found for. Shown on the import page, so
+        # nothing on a new form is left blank without anyone being told.
+        "unmatched_fields": [f["id"] for f in fields
+                             if f["type"] != "checkbox" and not f["variable"]],
+        "checkbox_fields": [f["id"] for f in fields if f["type"] == "checkbox"],
+        "unmatched_labels": unmatched_labels,
     }
 
 
@@ -152,8 +237,6 @@ def _labels_on_page(page, page_no: int, words) -> list[dict]:
             if not tail or len(label) < 4 or SKIP_LABELS.search(label):
                 continue
             var = match_variable(label)
-            if not var:
-                continue
             out.append({
                 "page": page_no,
                 "label": label,
@@ -161,6 +244,20 @@ def _labels_on_page(page, page_no: int, words) -> list[dict]:
                 "top": min(x["top"] for x in tail),
             })
     return out
+
+
+def _widen_street(fields: list[dict], labels: list[dict]) -> None:
+    """A Street box with no City box beside it is a one-line address: fill it whole.
+
+    Otherwise a single "Street Address" line would get the street and lose the
+    city, state and ZIP.
+    """
+    for rows in (fields, labels):
+        found = {r.get("variable") for r in rows}
+        if "home_line1" in found and "home_city" not in found:
+            for r in rows:
+                if r.get("variable") == "home_line1":
+                    r["variable"] = "home_full"
 
 
 def _dedupe(rows: list[dict]) -> list[dict]:
@@ -198,18 +295,16 @@ def suggest(pdf_path, form_key: str, title: str = "", county: str = "") -> tuple
             if f["type"] == "checkbox":
                 fields[f["id"]] = {"checkbox": True, "check": False}
                 continue
-            var = match_variable(f["id"])
+            var = f["variable"]
             if var:
                 matched += 1
             fields[f["id"]] = {"from": var} if var else {"literal": ""}
         base["fields"] = fields
         notes.append(f"This PDF has {len(info['fields'])} form field(s); "
-                     f"{matched} matched a client variable by name.")
-        unmatched = [f['id'] for f in info["fields"]
-                     if f["type"] != "checkbox" and not match_variable(f["id"])]
-        if unmatched:
-            notes.append("Set these by hand — the name gave no clue: "
-                         + ", ".join(unmatched[:12]))
+                     f"{matched} matched a client detail.")
+        if info["unmatched_fields"]:
+            notes.append(f"{len(info['unmatched_fields'])} box(es) weren't recognised and "
+                         "stay blank until you set them. They're listed below.")
         if any(f["type"] == "checkbox" for f in info["fields"]):
             notes.append("Checkboxes are left unticked. Give each one a rule "
                          "(check: true, or when: {field: …, equals: …}).")
@@ -218,7 +313,8 @@ def suggest(pdf_path, form_key: str, title: str = "", county: str = "") -> tuple
     # ---- flat scan ----
     if info["image_only"]:
         notes.append("This PDF has no text layer at all — it is an image. Nothing can "
-                     "be detected; every value has to be placed by hand on the page.")
+                     "be detected. Create it, then click on the form in the editor to "
+                     "place each value.")
         base["entries"] = []
         return base, notes
 
@@ -229,6 +325,9 @@ def suggest(pdf_path, form_key: str, title: str = "", county: str = "") -> tuple
     base["entries"] = entries
     notes.append(f"No form fields, so this is an overlay mapping. "
                  f"{len(entries)} value(s) were placed against a label found in the text.")
+    if info["unmatched_labels"]:
+        notes.append(f"{len(info['unmatched_labels'])} label(s) weren't matched to a client "
+                     "detail. They're listed below; place any that need filling by hand.")
     notes.append("CHECKBOXES WERE NOT DETECTED. On these forms the boxes are not text "
                  "or rectangles, so none can be found automatically — add each mark by "
                  "hand on the page.")

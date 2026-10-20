@@ -15,7 +15,7 @@
   <header class="masthead">
     <div class="masthead-inner">
       <a class="brand" href="{{ url_for('client_list') }}">Privacy Removal Toolkit
-        <small>Hillsborough County, FL</small></a>
+        <small>Florida</small></a>
       <nav>
         <a href="{{ url_for('client_list') }}" {% if nav == 'clients' %}aria-current="page"{% endif %}>Clients</a>
         <a href="{{ url_for('feedback_page') }}" id="comment-link"
@@ -28,9 +28,14 @@
   </main>
   {#- The form set-up tools are for whoever maps a new county form — rarely needed,
       so they live down here rather than in the menu everyone uses. -#}
+  <datalist id="florida-counties">
+    {% for c in florida_counties %}<option value="{{ c }}">{% endfor %}
+    <option value="Statewide">
+  </datalist>
   <footer class="site-footer">
     This tool prepares paperwork only — a person checks, signs and submits everything.
-    <span style="float:right"><a href="{{ url_for('forms_overview') }}">Form set-up</a></span>
+    <span style="float:right"><a href="{{ url_for('sites_page') }}">Opt-out sites</a>
+      &middot; <a href="{{ url_for('forms_overview') }}">Form set-up</a></span>
   </footer>
   <script>
     /* Capture the screen you are ON, before navigating to the comment page. */

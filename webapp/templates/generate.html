@@ -53,17 +53,38 @@
     {% if not forms %}
       <p class="muted">No forms are set up yet. See <a href="{{ url_for('forms_overview') }}">Form set-up</a>.</p>
     {% else %}
-      <p class="hint" style="margin-top:0">Tick none for all of them.</p>
-      <ul class="checklist">
-        {% for m in forms %}
-          <li><label class="check">
-            <input type="checkbox" name="forms[]" value="{{ m.form_key }}"
-                   {% if selected_forms and m.form_key in selected_forms %}checked{% endif %}>
-            <span>{{ m.title or m.form_key.replace('_', ' ') }}
-              {% if m.county %}<span class="muted">— {{ m.county }}</span>{% endif %}</span>
-          </label></li>
-        {% endfor %}
-      </ul>
+      {% macro form_row(m, ticked) %}
+        <li><label class="check">
+          <input type="checkbox" name="forms[]" value="{{ m.form_key }}" {% if ticked %}checked{% endif %}>
+          <span>{{ m.title or m.form_key.replace('_', ' ') }}
+            {% if m.county %}<span class="muted">— {{ m.county }}</span>{% endif %}</span>
+        </label></li>
+      {% endmacro %}
+      {% set mine = forms | selectattr('form_key', 'in', client_forms) | list %}
+      {% set others = forms | rejectattr('form_key', 'in', client_forms) | list %}
+      {% if mine %}
+        <p class="hint" style="margin-top:0">For {{ client_county or 'this client' }}
+          {%- if client_county != 'Statewide' %} and statewide{% endif %}. Tick none for all of these.</p>
+        <ul class="checklist">
+          {% for m in mine %}
+            {{ form_row(m, (m.form_key in selected_forms) if selected_forms else true) }}
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="note note-warn">No forms are set up for
+          {{ client_county or "this client's county" }} yet. Add them on
+          <a href="{{ url_for('forms_overview') }}">Form set-up</a>, or tick one below.</p>
+      {% endif %}
+      {% if others %}
+        <details class="more" {% if not mine or (selected_forms and others | selectattr('form_key', 'in', selected_forms) | list) %}open{% endif %}>
+          <summary>Other counties' forms ({{ others | length }})</summary>
+          <ul class="checklist">
+            {% for m in others %}
+              {{ form_row(m, selected_forms and m.form_key in selected_forms) }}
+            {% endfor %}
+          </ul>
+        </details>
+      {% endif %}
     {% endif %}
   </fieldset>
 

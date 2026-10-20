@@ -25,6 +25,7 @@ import shutil
 import sys
 from pathlib import Path
 
+from fill_forms import shipped_form_keys
 from paths import ROOT
 
 DEST_NAME = "Privacy Toolkit (test copy)"
@@ -39,6 +40,7 @@ FILES = [
     "paths.py", "client_context.py", "fill_forms.py", "validate_client.py",
     "build_worklist.py", "pdf_fill.py", "pdf_overlay.py", "pdf_render.py",
     "mapping_edit.py", "form_import.py", "feedback.py", "scaffold_mapping.py",
+    "counties.py", "sites_edit.py",
     "documents.py", "pdf_attachment.py", "import_documents.py",
     "generation_log.py",                 # imported by the engine — omitting it
     "case_export.py",                    # broke the copy on the first import
@@ -52,13 +54,9 @@ FILES = [
 
 FOLDERS = ["webapp"]
 
-# Real county forms only. The demo form and anything scratch stays behind.
-FORM_KEYS = [
-    "hillsborough_clerk_redaction",
-    "hillsborough_appraiser_confidentiality",
-    "hillsborough_appraiser_military",
-    "fl_dos_public_records_exemption",
-]
+# Real county forms only, found rather than listed so a new county's form ships
+# without editing this file. The demo form and anything scratch stays behind.
+FORM_KEYS = shipped_form_keys()
 
 SKIP_DIRS = {"__pycache__", ".venv", "_backups"}
 

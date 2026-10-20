@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Opt-out sites{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>Opt-out sites</h1>
+    <p class="lede">The {{ count }} sites on every client's opt-out checklist, in the order
+      they're worked through.</p>
+  </div>
+</div>
+
+{% if error %}<p class="note note-error"><strong>{{ error }}</strong></p>{% endif %}
+{% if added %}
+  <form method="post" action="{{ url_for('site_undo') }}" class="note note-ok">
+    <strong>{{ added }} was added.</strong> It's on every client's list from now on.
+    Rebuild a client's worklist spreadsheet to add it there, and reopen the Opt-out
+    Assistant if it's already open.
+    <input type="hidden" name="backup" value="{{ backup }}">
+    <button type="submit" class="btn-small">Undo</button>
+  </form>
+{% endif %}
+{% if removed %}
+  <form method="post" action="{{ url_for('site_undo') }}" class="note note-ok">
+    <strong>{{ removed }} was removed.</strong> What was already recorded for it stays in
+    each client's worklist, marked "no longer in catalog".
+    <input type="hidden" name="backup" value="{{ backup }}">
+    <button type="submit" class="btn-small">Undo</button>
+  </form>
+{% endif %}
+{% if undone %}<p class="note note-ok"><strong>Put back the way it was.</strong></p>{% endif %}
+
+<p class="note note-warn">Changes here apply to <strong>every client</strong>.</p>
+
+{% for g in groups if g.sites %}
+  <h2>{{ g.title }}</h2>
+  <div class="table-wrap">
+    <table>
+      <tbody>
+        {% for s in g.sites %}
+        <tr>
+          <td style="width:40%">
+            <a href="{{ s.get('opt_out_url') }}" target="_blank"
+               rel="noopener noreferrer external"><strong>{{ s.get('name') or s.get('key') }}</strong></a>
+            {% if s.get('client_needed') %}<br><span class="tag">needs the client</span>{% endif %}
+          </td>
+          <td class="muted">{{ s.get('notes') or '' }}</td>
+          <td class="actions" style="white-space:nowrap">
+            {% if not s.safe %}
+              <span class="muted" title="Its key in sites.yaml is missing or unusual">fix in sites.yaml</span>
+            {% else %}
+            <form method="post" action="{{ url_for('site_move', key=s.key) }}" style="display:inline">
+              <button type="submit" name="direction" value="up" class="btn-small btn-quiet"
+                      aria-label="Move {{ s.get('name') }} up" {% if loop.first %}disabled{% endif %}>↑</button>
+              <button type="submit" name="direction" value="down" class="btn-small btn-quiet"
+                      aria-label="Move {{ s.get('name') }} down" {% if loop.last %}disabled{% endif %}>↓</button>
+            </form>
+            <form method="post" action="{{ url_for('site_remove', key=s.key) }}" style="display:inline">
+              <button type="submit" class="btn-small btn-danger-quiet">Remove</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endfor %}
+
+<form method="post" action="{{ url_for('site_add') }}" id="add">
+  <fieldset>
+    <legend>Add a site</legend>
+    <div class="grid two">
+      <div class="field">
+        <label for="name">Site name</label>
+        <input type="text" id="name" name="name" required autocomplete="off"
+               value="{{ form.get('name', '') }}" placeholder="PeopleFinders">
+      </div>
+      <div class="field">
+        <label for="category">Kind of site</label>
+        <select id="category" name="category" required>
+          {% for key, title in categories %}
+            <option value="{{ key }}" {% if form.get('category', 'data_broker') == key %}selected{% endif %}>
+              {{ title.replace(' (last)', '') }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field wide">
+        <label for="opt_out_url">Opt-out page</label>
+        <input type="url" id="opt_out_url" name="opt_out_url" required autocomplete="off"
+               value="{{ form.get('opt_out_url', '') }}" placeholder="https://www.example.com/opt-out">
+        <p class="hint">Open the site's opt-out page and copy the address from the browser.</p>
+      </div>
+      <div class="field wide">
+        <span class="label">What its form asks for</span>
+        <div class="check-grid">
+          {% set chosen = form.get('needs') or [] %}
+          {% for key, label in needs_choices %}
+            <label class="check"><input type="checkbox" name="needs[]" value="{{ key }}"
+              {% if key in chosen %}checked{% endif %}> {{ label }}</label>
+          {% endfor %}
+        </div>
+        <p class="hint">These go in the client's worklist, ready to copy.</p>
+      </div>
+      <div class="field wide">
+        <label for="client_needed">Needs the client <span class="muted">(optional)</span></label>
+        <input type="text" id="client_needed" name="client_needed" autocomplete="off"
+               value="{{ form.get('client_needed', '') }}"
+               placeholder="The client has to receive a text message code">
+      </div>
+      <div class="field wide">
+        <label for="notes">What to know <span class="muted">(optional)</span></label>
+        <input type="text" id="notes" name="notes" autocomplete="off"
+               value="{{ form.get('notes', '') }}"
+               placeholder="Search, pick the client's record, then confirm by email.">
+      </div>
+      <div class="field wide">
+        <input type="hidden" name="supports_agent" value="0">
+        <label class="check"><input type="checkbox" name="supports_agent" value="1"
+          {% if form.get('supports_agent', '1') == '1' %}checked{% endif %}>
+          We can do this one for the client</label>
+      </div>
+    </div>
+    <div class="actions-bar">
+      <button type="submit" class="primary">Add this site</button>
+    </div>
+  </fieldset>
+</form>
+
+{% endblock %}

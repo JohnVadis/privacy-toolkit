@@ -18,6 +18,7 @@ Available client variables (see client_context.py):
 """
 from __future__ import annotations
 import os, sys
+import form_import
 import pdf_fill
 
 VARS_HINT = ("full_name first_name middle_name last_name suffix dob phone email "
@@ -47,6 +48,8 @@ def main():
         f"# Mapping for '{form_key}'. Edit each field ONCE, then reuse for every client.",
         f"# Variables you can use with `from:` -> {VARS_HINT}",
         f"form_key: {form_key}",
+        "mode: fillable",
+        "county: \"\"   # e.g. Pinellas, or Statewide — decides which clients get this form",
         f"pdf: {pdf_path}",
         "fields:",
     ]
@@ -57,8 +60,14 @@ def main():
                          f"Use {{checkbox: true, check: true}} or {{checkbox: true, when: {{field: exemption_code, equals: FL_119_071_4d}}}}")
             lines.append(f"    {{ checkbox: true, check: false }}")
         else:
-            lines.append(f"  {fid}:  # {f['type']} — set `from:` a variable or `literal:` a constant")
-            lines.append(f"    {{ from: \"\" }}")
+            # Same recognition the app's "Add a form" uses, so the two agree.
+            guess = form_import.match_variable(f["id"], f.get("label") or "")
+            if guess:
+                lines.append(f"  {fid}:  # {f['type']} — guessed from its name; check it")
+                lines.append(f"    {{ from: {guess} }}")
+            else:
+                lines.append(f"  {fid}:  # {f['type']} — NOT RECOGNISED: set `from:` a variable or `literal:` a constant")
+                lines.append(f"    {{ literal: \"\" }}")
     with open(out, "w") as fh:
         fh.write("\n".join(lines) + "\n")
     print(f"Wrote {out} with {len(fields)} field(s). Open it and fill in the `from:`/`literal:` values.")

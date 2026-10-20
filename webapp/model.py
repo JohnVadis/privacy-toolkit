@@ -10,6 +10,7 @@ web app and the CLI.
 """
 from __future__ import annotations
 
+import counties
 from paths import slugify
 
 ROLES = ("primary", "spouse", "child", "dependent")
@@ -109,6 +110,9 @@ def _person_from_form(p) -> dict:
 def _address_from_form(a) -> dict:
     a = a if isinstance(a, dict) else {}
     addr = {k: _s(a.get(k)) for k in ADDRESS_TEXT_FIELDS}
+    # One spelling per county ("pinellas county" -> "Pinellas"): it is what matches
+    # a client to their county's forms.
+    addr["county"] = counties.normalise(addr["county"])
     addr["current"] = _truthy(a.get("current"))
     addr["residence"] = False  # set by the caller from the radio group
     return addr

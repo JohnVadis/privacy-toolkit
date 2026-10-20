@@ -39,6 +39,10 @@ def list_fields(pdf_path: str) -> list[dict]:
         # pypdf hands back its own string object; plain str keeps these safe to
         # serialize into a mapping file and to compare against one.
         entry = {"id": str(name), "type": kind}
+        # The tooltip (/TU) is often the human wording ("Applicant's first name")
+        # when the name itself is just "Text1".
+        if f.get("/TU"):
+            entry["label"] = str(f.get("/TU"))
         if kind == "checkbox":
             entry["on_value"] = str(_checkbox_on_value(f))
         out.append(entry)

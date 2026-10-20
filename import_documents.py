@@ -148,8 +148,13 @@ def main():
     client = documents.set_documents(client, combined)
     path = resolve(args.client)
     path.write_text(dump_client(client), encoding="utf-8")
-    print(f"\nSaved to {path}. Generate the Clerk form to see them on it:")
-    print(f"  python fill_forms.py --client {args.client} --forms hillsborough_clerk_redaction")
+    # Whichever of the client's forms prints the document list (a `tables:` block).
+    from fill_forms import forms_for_client
+
+    with_table = [m["form_key"] for m in forms_for_client(client) if m.get("tables")]
+    print(f"\nSaved to {path}. Generate the forms to see them on it:")
+    print(f"  python fill_forms.py --client {args.client}"
+          + (f" --forms {' '.join(with_table)}" if with_table else ""))
 
 
 if __name__ == "__main__":

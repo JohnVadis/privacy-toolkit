@@ -5,8 +5,10 @@ clients/*
 !clients/_TEMPLATE.yaml
 output/
 # Blank county forms are public documents, not client data, and a build machine
-# cannot produce a working app without them. The four real ones are tracked; any
-# other PDF dropped in here (a scratch form, a client's own paperwork) is not.
+# cannot produce a working app without them. The real ones are tracked; any other
+# PDF dropped in here (a scratch form, a client's own paperwork) is not. Adding a
+# county's form to the packaged app = adding its blank PDF to this list (the
+# packagers ship every mapping whose PDF is tracked — fill_forms.shipped_form_keys).
 forms/_blank_pdfs/*.pdf
 !forms/_blank_pdfs/demo_redaction.pdf
 !forms/_blank_pdfs/Hillsborough_Redaction.pdf
@@ -18,6 +20,8 @@ __pycache__/
 .venv/
 venv/
 trash/
+# Previous versions of the opt-out site list, kept by the app on every change.
+_sites_backups/
 
 # Exported cases are a whole client in one file, in plaintext.
 exports/

@@ -461,3 +461,11 @@ details.log pre {
 }
 
 .htmx-request { opacity: 0.6; }
+
+/* A list of PDF box names: compact, wrapping columns rather than one long column. */
+.box-list { columns: 14rem auto; column-gap: 1.5rem; margin: 0.4rem 0 0.8rem; padding-left: 1.2rem; }
+.box-list li { break-inside: avoid; font-size: 0.9em; }
+
+/* Tick boxes in columns (what an opt-out site's form asks for). */
+.check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: 0.25rem 1rem; margin-top: 0.3rem; }
+.field .label { display: block; font-weight: 600; margin-bottom: 0.25rem; }

@@ -13,7 +13,10 @@ There are two front ends over one engine: the original CLI, and a desktop app
 (`webapp/`, HTML in a pywebview window) for non-technical workers. Both call the
 same functions.
 
-Current scope: **Hillsborough County, FL**. Four forms wired and verified.
+Current scope: **Hillsborough County, FL** forms plus one statewide form, all verified.
+Counties are data: `counties.py` holds Florida's 67 and one spelling for each, and
+`fill_forms.forms_for_client()` gives a client their residence county's forms plus the
+statewide ones. A mapping with `county: Pinellas` reaches Pinellas clients with no code.
 
 Runs on Windows and macOS. Everything platform-specific goes through one branch —
 `paths._root()` (where user data lives), `webapp.deps.reveal()`, `desktop.problem()`
@@ -135,6 +138,13 @@ display name, because two clients can share a display name and then share a fold
   without `check_mapping()`.
 - `form_import.py` — blank PDF -> proposed mapping. Honest about its limits: checkboxes
   on these flat county forms are undetectable, and an image-only scan yields nothing.
+  Box names are read the way a person would (`readable_name`: `txtFirstName[0]` ->
+  "First Name", plus the /TU tooltip); `NOT_THE_CLIENT` keeps spouse/notary/prior-address
+  boxes blank. Every box it can't match is LISTED, never dropped silently, and
+  `mapping_edit.field_coverage()` keeps reporting a fillable form's unset boxes.
+- `sites_edit.py` + `webapp/routers/sites.py` — add/remove/reorder opt-out sites. Saves
+  keep the header comment, every other site's settings and a backup; never hand-roll a
+  yaml.safe_dump of sites.yaml (it drops the comments).
 - `pdf_render.py` — page -> PNG, and the point size needed to turn a click into a coordinate.
 - `documents.py` — the client's `documents:` list (instrument/book/page/title) and the
   CSV parser that fills it. Parses; never fetches. One store, two lists (`redact`,

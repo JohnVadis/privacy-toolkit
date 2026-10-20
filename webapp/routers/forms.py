@@ -23,6 +23,7 @@ import yaml
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
+import counties
 import form_import
 import mapping_edit
 import pdf_render
@@ -53,6 +54,8 @@ def _mapping_or_404(form_key: str) -> dict:
 @router.get("/forms", response_class=HTMLResponse, name="forms_overview")
 async def forms_overview(request: Request):
     mappings = list_mappings()
+    for m in mappings:
+        m["blank_boxes"] = len(_coverage(m)["blank"])
     return templates.TemplateResponse(
         request=request, name="forms.html",
         context={
@@ -94,12 +97,23 @@ async def mapping_edit_page(request: Request, form_key: str, page: int = 1,
             "saved": request.query_params.get("saved") == "1",
             "imported": request.query_params.get("imported") == "1",
             "pins": _entry_pins(current, meta, EXAMPLE_CLIENT),
+            "coverage": _coverage(meta),
             "size": _page_size(meta, max(1, min(page, pages))),
             "variables": CONTEXT_VARIABLES,
             "conditions": MARK_CONDITIONS,
             "example_slug": EXAMPLE_SLUG,
         },
     )
+
+
+def _coverage(meta: dict) -> dict:
+    """Boxes on a fillable form that nothing fills (see mapping_edit.field_coverage)."""
+    if meta.get("error") or meta.get("mode") != "fillable" or not meta.get("pdf_present"):
+        return {"blank": [], "missing": [], "total": 0}
+    try:
+        return mapping_edit.field_coverage(yaml.safe_load(meta["path"].read_text(encoding="utf-8")))
+    except Exception:
+        return {"blank": [], "missing": [], "total": 0}
 
 
 def _page_size(meta: dict, page: int) -> tuple[float, float]:
@@ -483,9 +497,13 @@ async def form_import_upload(request: Request, pdf: UploadFile = File(...),
 
     BLANK_PDF_DIR.mkdir(parents=True, exist_ok=True)
     dest = BLANK_PDF_DIR / f"{key}.pdf"
+    if _pdf_in_use(dest):
+        return back(f"A form already uses a blank PDF called {dest.name}. Give this one a "
+                    "different short name.")
     dest.write_bytes(raw)
 
     info = form_import.analyze(dest)
+    county = counties.normalise(county, form=True)
     mapping, notes = form_import.suggest(dest, key, title, county)
     text = yaml.safe_dump(mapping, sort_keys=False, allow_unicode=True, width=100)
     _, problems = mapping_edit.check_mapping(text, expect_key=key)
@@ -499,6 +517,20 @@ async def form_import_upload(request: Request, pdf: UploadFile = File(...),
             "problems": problems, "text": text,
         },
     )
+
+
+def _pdf_in_use(path: Path) -> bool:
+    """True when some form's mapping fills this PDF.
+
+    Compared case-insensitively: Windows and macOS treat Hillsborough_Redaction.pdf
+    and hillsborough_redaction.pdf as one file, so an upload under the lowercase
+    name would replace a live form's blank — and Start over would then delete it.
+    """
+    target = str(path.resolve()).casefold()
+    for m in list_mappings():
+        if m.get("pdf") and str(resolve(m["pdf"]).resolve()).casefold() == target:
+            return True
+    return False
 
 
 def _reject_pdf(filename: str, raw: bytes) -> str:
@@ -518,6 +550,17 @@ def _reject_pdf(filename: str, raw: bytes) -> str:
         return ("That file isn't a PDF. Blank forms have to be PDFs — this one doesn't "
                 "start like one, whatever it's called.")
     return ""
+
+
+@router.post("/forms/new/cancel", name="form_import_cancel")
+async def form_import_cancel(request: Request):
+    """Start over: drop the PDF an abandoned import saved, unless a form now uses it."""
+    data = parse_nested((await request.form()).multi_items())
+    key = slugify(str(data.get("form_key") or ""))
+    pending = BLANK_PDF_DIR / f"{key}.pdf"
+    if key and not mapping_edit.mapping_file(key).exists() and not _pdf_in_use(pending):
+        pending.unlink(missing_ok=True)
+    return RedirectResponse(url_for(request, "form_import_page"), status_code=303)
 
 
 @router.post("/forms/new/create", name="form_import_create")

@@ -38,7 +38,7 @@ from fastapi.staticfiles import StaticFiles
 
 from webapp.deps import STATIC_DIR, templates
 from webapp.routers import (clients, corrections, documents, feedback, forms,
-                            generate)
+                            generate, sites)
 from webapp.security import LocalOnlyMiddleware, entry_url
 
 app = FastAPI(
@@ -60,6 +60,7 @@ app.include_router(generate.router)
 app.include_router(corrections.router)
 app.include_router(forms.router)
 app.include_router(feedback.router)
+app.include_router(sites.router)
 
 
 @app.exception_handler(HTTPException)

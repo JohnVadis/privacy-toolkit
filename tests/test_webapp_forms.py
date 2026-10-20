@@ -394,6 +394,36 @@ class TestFormImport:
         response = self.upload(app_client, flat_form.read_bytes(), form_key="editable")
         assert response.status_code == 400 and "already exists" in response.text
 
+    def test_will_not_replace_a_pdf_another_form_uses(self, app_client, flat_form):
+        # Windows and macOS ignore case: this name IS the Clerk form's blank.
+        live = paths.BLANK_PDF_DIR / "Hillsborough_Redaction.pdf"
+        before = live.read_bytes()
+        response = self.upload(app_client, flat_form.read_bytes(),
+                               form_key="hillsborough_redaction")
+        assert response.status_code == 400 and "already uses" in response.text
+        app_client.post("/forms/new/cancel", data={"form_key": "hillsborough_redaction"})
+        assert live.read_bytes() == before
+
+    def test_start_over_removes_the_abandoned_upload(self, app_client, flat_form):
+        self.upload(app_client, flat_form.read_bytes())
+        assert (paths.BLANK_PDF_DIR / "imported.pdf").is_file()
+        r = app_client.post("/forms/new/cancel", data={"form_key": "imported"},
+                            follow_redirects=False)
+        assert r.status_code == 303
+        assert not (paths.BLANK_PDF_DIR / "imported.pdf").exists()
+
+    def test_lists_the_boxes_it_could_not_recognise(self, app_client, tmp_path):
+        from reportlab.pdfgen import canvas
+
+        pdf = tmp_path / "fillable.pdf"
+        c = canvas.Canvas(str(pdf))
+        c.acroForm.textfield(name="FirstName", x=72, y=700, width=200, height=18)
+        c.acroForm.textfield(name="Mystery_Box_7", x=72, y=660, width=200, height=18)
+        c.showPage()
+        c.save()
+        body = self.upload(app_client, pdf.read_bytes()).text
+        assert "Boxes that need you" in body and "Mystery_Box_7" in body
+
     def test_keeps_what_was_typed_when_an_upload_is_refused(self, app_client):
         response = self.upload(app_client, b"not a pdf", title="My Long Form Title")
         assert "My Long Form Title" in response.text

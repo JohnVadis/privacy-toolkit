@@ -35,8 +35,11 @@
         </div>
         <div class="field">
           <label for="county">County</label>
-          <input type="text" id="county" name="county" autocomplete="off"
-                 value="{{ county | default('', true) }}" placeholder="Pinellas">
+          <input type="text" id="county" name="county" autocomplete="off" required
+                 list="florida-counties" value="{{ county | default('', true) }}"
+                 placeholder="Pinellas, or Statewide">
+          <p class="hint">Every client living in this county gets the form. Pick
+            <em>Statewide</em> for a form everyone gets.</p>
         </div>
         <div class="field wide">
           <label for="title">Full title</label>
@@ -97,6 +100,28 @@
       </div>
     {% endif %}
 
+    {% if info and (info.unmatched_fields or info.unmatched_labels or info.checkbox_fields) %}
+      <div class="card">
+        <h2 style="margin-top:0">Boxes that need you</h2>
+        {% if info.unmatched_fields %}
+          <p><strong>{{ info.unmatched_fields | length }} box(es) weren't recognised.</strong>
+            They stay blank until you give each one a client detail in the mapping below
+            (<span class="mono">from: first_name</span>, for example) or fixed text.</p>
+          <ul class="box-list">{% for f in info.unmatched_fields %}<li class="mono">{{ f }}</li>{% endfor %}</ul>
+        {% endif %}
+        {% if info.checkbox_fields %}
+          <p><strong>{{ info.checkbox_fields | length }} tick box(es)</strong> start unticked.
+            Give each one a rule if it should be ticked.</p>
+          <ul class="box-list">{% for f in info.checkbox_fields %}<li class="mono">{{ f }}</li>{% endfor %}</ul>
+        {% endif %}
+        {% if info.unmatched_labels %}
+          <p><strong>{{ info.unmatched_labels | length }} label(s) on the page weren't matched</strong>
+            to a client detail. Place any that need filling by clicking the form in the editor.</p>
+          <ul class="box-list">{% for f in info.unmatched_labels %}<li>{{ f }}</li>{% endfor %}</ul>
+        {% endif %}
+      </div>
+    {% endif %}
+
     {% if problems %}
       <div class="note note-error">
         <strong>This proposal has problems and can't be saved as-is.</strong>
@@ -112,7 +137,8 @@
       </div>
       <div class="actions-bar">
         <button type="submit" class="primary">Create this form</button>
-        <a class="btn btn-quiet" href="{{ url_for('form_import_page') }}">Start over</a>
+        <button type="submit" class="btn-quiet" formaction="{{ url_for('form_import_cancel') }}"
+                formnovalidate>Start over</button>
       </div>
     </fieldset>
   </form>

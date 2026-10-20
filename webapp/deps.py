@@ -16,6 +16,7 @@ from fastapi import HTTPException
 from fastapi.templating import Jinja2Templates
 from jinja2 import pass_context
 
+import counties
 from client_context import client_path, load_client
 from paths import (BUNDLED, CLIENTS_DIR, OUTPUT_DIR, RESERVED_CLIENT_STEMS, ROOT,
                    contains)
@@ -79,6 +80,10 @@ def form_names(text) -> str:
 
 
 templates.env.filters["form_names"] = form_names
+
+# The county picker (a <datalist> in base.html) for client addresses and new forms:
+# both must use one spelling, because that is how clients are matched to forms.
+templates.env.globals["florida_counties"] = counties.FLORIDA_COUNTIES
 
 # Client file stems. Permissive enough for a hand-named file like "Jane D",
 # strict enough to exclude separators, "..", and leading dots.

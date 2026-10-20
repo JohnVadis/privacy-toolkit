@@ -19,6 +19,14 @@
   <p class="note note-ok"><strong>Saved.</strong> The previous version was kept in
     <span class="mono">forms/mappings/_backups/</span>.</p>
 {% endif %}
+{% if coverage and coverage.blank %}
+  <div class="note note-warn">
+    <strong>{{ coverage.blank | length }} of this form's {{ coverage.total }} boxes are not set</strong>
+    and will be left blank on every client's form. Give each one a client detail
+    (<span class="mono">from: …</span>) or fixed text in the mapping below if it should be filled.
+    <ul class="box-list">{% for f in coverage.blank %}<li class="mono">{{ f }}</li>{% endfor %}</ul>
+  </div>
+{% endif %}
 {% if problems %}
   <div class="note note-error">
     <strong>Not saved — {{ problems | length }} problem{{ '' if problems | length == 1 else 's' }}.</strong>

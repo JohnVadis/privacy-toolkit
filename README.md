@@ -354,8 +354,38 @@ form) everything is found. If it's a flat scan it finds most of the text values 
 nothing to detect and you place those yourself. If it's a plain image, nothing can be
 detected at all. The importer tells you which case you're in.
 
+Nothing is dropped silently. The import page lists every box it **couldn't** match to a
+client detail, every tick box, and every label on a flat form it couldn't place; a
+fillable form's editor, and the Forms list, keep saying how many boxes are still not
+set. A scanned form with nothing detectable can still be created and filled in by
+clicking on it.
+
 From a terminal: `python form_import.py <file.pdf> <short_name>` to see the proposal,
 `--write` to save it.
+
+## Adding a county
+There is no code to change. On **Form set-up → Add a form**, upload the county's blank
+PDF and pick the county from the list (all 67 Florida counties are in it; *Statewide*
+is for a form everyone gets). Place any boxes it didn't recognise, check the preview,
+and that's it: every client whose residence is in that county now gets the form —
+ticked for them on **Make forms**, with other counties' forms tucked underneath.
+
+A client's county is typed or picked on their address and saved one way
+("pinellas county" becomes *Pinellas*), so it always matches the forms. A county that
+isn't a Florida county gets a warning (with "Did you mean…?" for a typo) rather than
+a refusal, so an out-of-state client can still be saved. A packaged copy
+(`build_exe.py`, `make_test_copy.py`) ships every real form it finds, so a new county's
+form needs no allowlist edit — only its blank PDF added to `.gitignore`'s exceptions
+to be committed.
+
+## The opt-out sites
+**Opt-out sites** (bottom of every page, and *Add or remove sites* on a client's
+Opt-outs tab) lists every site on the checklist. **Add a site** takes its name, its
+opt-out page, what kind of site it is, and what its form asks for. **Remove** takes one
+off — with **Undo** straight after — and the arrows reorder within a section. The list
+is shared by every client. What was already recorded for a removed site stays in each
+client's worklist, marked "no longer in catalog". Every change keeps the previous
+version in `_sites_backups/`.
 
 ## Sending a comment
 **Comment** at the top of any screen takes a picture of what you're looking at. Drag on

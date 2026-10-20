@@ -81,9 +81,16 @@ class TestStructure:
         data, found = check_mapping("entries: [unclosed\n")
         assert data is None and found
 
-    def test_an_overlay_mapping_needs_entries(self, flat_form):
+    def test_a_scanned_form_can_start_with_no_entries(self, flat_form):
+        # Nothing can be found on an image-only scan; it still has to be creatable
+        # so its values can be placed in the editor.
         text = yaml.safe_dump({"form_key": "x", "mode": "overlay",
                                "pdf": str(flat_form), "entries": []})
+        assert not any("entries" in p for p in problems(text))
+
+    def test_entries_must_be_a_list(self, flat_form):
+        text = yaml.safe_dump({"form_key": "x", "mode": "overlay",
+                               "pdf": str(flat_form), "entries": "full_name"})
         assert any("needs a list of entries" in p for p in problems(text))
 
 

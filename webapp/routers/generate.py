@@ -19,7 +19,8 @@ import case_export
 import generation_log
 from build_worklist import WORKLIST_FILENAME, build_worklist, load_sites
 from client_context import ClientDataError, person_roles
-from fill_forms import fill_client, generated_files, list_mappings, output_dir
+from fill_forms import (client_county, fill_client, forms_for_client, generated_files,
+                        list_mappings, output_dir)
 from validate_client import errors, validate_client, warnings
 from webapp.deps import (collector, get_client, launch_optout, output_file,
                          reveal, templates, url_for)
@@ -53,6 +54,10 @@ def _picker_context(request: Request, slug: str, client: dict, **extra) -> dict:
         "display_name": (client.get("case") or {}).get("display_name") or slug,
         "people": _people(client),
         "forms": _available_forms(),
+        # The client's county's forms plus the statewide ones: ticked to start with,
+        # and what "tick none" means. Every other form is offered underneath.
+        "client_county": client_county(client),
+        "client_forms": [m["form_key"] for m in forms_for_client(client, _available_forms())],
         # Shown instead of internal form keys once forms are made.
         "titles": {m["form_key"]: m.get("title") or "" for m in list_mappings()},
         "output_rel": f"output/{output_dir(client).name}",
