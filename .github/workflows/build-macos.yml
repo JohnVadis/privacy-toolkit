@@ -96,6 +96,16 @@ jobs:
             echo "the Opt-out Assistant check failed (exit $code)"; exit 1
           fi
 
+      - name: Check every screen works in the built app
+        # The BUILT app, driven headless through what a worker does first: open the
+        # client list, add a client, open each tab, make the forms. A server error
+        # prints its traceback here. Run against a scratch copy of the data folder
+        # so the shipped folder stays clean.
+        run: |
+          HOME_DIR="$(mktemp -d)"
+          cp -R "dist/Privacy Toolkit/forms" "dist/Privacy Toolkit/sites.yaml" "$HOME_DIR/"
+          PRIVACY_TOOLKIT_HOME="$HOME_DIR"             "dist/Privacy Toolkit/Privacy Toolkit.app/Contents/MacOS/Privacy Toolkit" --page-check
+
       - name: Check the shipped folder is complete
         # Inspects what was BUILT, not the checkout it was built from. A bundle
         # missing its beside-the-app files launches and then cannot fill anything,

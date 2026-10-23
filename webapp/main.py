@@ -74,6 +74,42 @@ async def http_error(request: Request, exc: HTTPException):
     )
 
 
+def _cannot_write(exc: BaseException) -> bool:
+    import errno
+
+    return isinstance(exc, PermissionError) or (
+        isinstance(exc, OSError) and exc.errno in (errno.EROFS, errno.EACCES, errno.EPERM))
+
+
+@app.exception_handler(Exception)
+async def unexpected_error(request: Request, exc: Exception):
+    """A page that says what went wrong, instead of a bare "Internal Server Error".
+
+    The worker can do nothing with that phrase. The traceback still goes to stderr
+    (uvicorn prints it), and nothing here echoes a field value: the message names
+    the kind of problem and the app's own folder, never what was being saved.
+    """
+    from paths import ROOT
+
+    if _cannot_write(exc):
+        detail = (f"The toolkit couldn't save into its folder ({ROOT}). That usually "
+                  "means it was opened straight from the download, where macOS runs "
+                  "it from a hidden read-only copy, or the folder is somewhere this "
+                  "account can't write. Quit the app, move the whole \"Privacy "
+                  "Toolkit\" folder into Documents, and open it from there.")
+    else:
+        detail = (f"Something went wrong ({type(exc).__name__}). Nothing was "
+                  "submitted anywhere. Use Comment at the top to report it, saying "
+                  "what you pressed, and try again.")
+    try:
+        return templates.TemplateResponse(
+            request=request, name="error.html",
+            context={"status": "Something went wrong", "detail": detail},
+            status_code=500)
+    except Exception:
+        return HTMLResponse(f"<h1>Something went wrong</h1><p>{detail}</p>", status_code=500)
+
+
 @app.get("/healthz", response_class=HTMLResponse, include_in_schema=False)
 async def healthz():
     return HTMLResponse("ok")

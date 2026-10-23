@@ -87,7 +87,40 @@ def _wait_until_started(server, timeout: float = READY_TIMEOUT) -> bool:
     return False
 
 
+def _cannot_save_here() -> str:
+    """Why this copy of the app can't keep client files, or '' if it can.
+
+    Checked before the window opens, because otherwise the list of clients loads
+    fine and the first save — adding a client — fails with a server error.
+    """
+    from paths import ROOT
+
+    where = f"{sys.executable} {Path(sys.executable).resolve().as_posix()}"
+    if sys.platform == "darwin" and "/AppTranslocation/" in where:
+        return ("macOS is running the toolkit from a hidden, read-only copy, because it "
+                "was opened straight from where it was downloaded. Your client files "
+                "can't be saved there.\n\nQuit, move the whole \"Privacy Toolkit\" "
+                "folder into Documents (drag it there in Finder), and open the app "
+                "from its new place.")
+    try:
+        probe_dir = ROOT / "clients"
+        probe_dir.mkdir(parents=True, exist_ok=True)
+        probe = probe_dir / ".write-test"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink()
+    except OSError as exc:
+        return (f"The toolkit can't save client files in its folder:\n{ROOT}\n\n"
+                f"({exc.strerror or exc}). Move the whole \"Privacy Toolkit\" folder "
+                "into Documents and open it from there.")
+    return ""
+
+
 def main() -> int:
+    blocked = _cannot_save_here()
+    if blocked:
+        problem(blocked)
+        return 1
+
     try:
         import webview
     except ImportError:
@@ -192,7 +225,99 @@ def _optout_check() -> int:
         return 1
 
 
+def page_check() -> int:
+    """`--page-check`: drive the BUILT app through its main screens, headless.
+
+    Starts the real server on loopback and, as the window would, adds a client,
+    opens each of its tabs and makes its forms. Any server error prints its
+    traceback (uvicorn writes it to stderr) and fails the check. Run by CI against
+    the frozen app on every platform it ships for: a module PyInstaller left out
+    only shows up in the frozen app, never in the tests.
+    Set PRIVACY_TOOLKIT_HOME to a scratch folder first — it writes a client.
+    """
+    import http.cookiejar
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    from webapp.security import SESSION_TOKEN, TOKEN_COOKIE
+
+    blocked = _cannot_save_here()
+    if blocked:
+        print("failed:", blocked)
+        return 1
+    sock, port = bind()
+    server, sock = make_server(sock)
+    threading.Thread(target=server.run, kwargs={"sockets": [sock]}, daemon=True).start()
+    if not _wait_until_started(server):
+        print("failed: the server did not start")
+        return 1
+
+    base = f"http://127.0.0.1:{port}"
+    jar = http.cookiejar.CookieJar()
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+    opener.addheaders = [("Sec-Fetch-Site", "same-origin"), ("Origin", base)]
+    failures = []
+
+    def hit(label, path, data=None, ok=(200,)):
+        body = urllib.parse.urlencode(data, doseq=True).encode() if data is not None else None
+        try:
+            with opener.open(base + path, data=body, timeout=120) as r:
+                code, final = r.status, r.geturl()
+        except urllib.error.HTTPError as exc:
+            code, final = exc.code, path
+        print(f"{'ok  ' if code in ok else 'FAIL'} {code} {label}", flush=True)
+        if code not in ok:
+            failures.append(label)
+        return final
+
+    hit("start (spends the token)", f"/?k={SESSION_TOKEN}")
+    if not any(c.name == TOKEN_COOKIE for c in jar):
+        print("failed: no session cookie")
+        return 1
+    hit("client list", "/")
+    hit("new client page", "/clients/new")
+    for frag in ("person?index=1", "address?pi=0&index=1", "contact?pi=0&kind=phones"):
+        hit(f"add-row fragment {frag.split('?')[0]}", f"/clients/fragments/{frag}")
+    client = {
+        "case[display_name]": "Page Check", "case[exemption][category]": "military",
+        "persons[0][role]": "primary", "persons[0][first_name]": "Pat",
+        "persons[0][last_name]": "Check", "persons[0][dob]": "1980-01-02",
+        "persons[0][phones][]": "813-555-0100", "persons[0][emails][]": "pat@example.com",
+        "persons[0][residence_index]": "0",
+        "persons[0][addresses][0][line1]": "1 Example St",
+        "persons[0][addresses][0][city]": "Tampa",
+        "persons[0][addresses][0][county]": "hillsborough county",
+        "persons[0][addresses][0][state]": "FL", "persons[0][addresses][0][zip]": "33602",
+    }
+    landed = hit("add a client", "/clients/new", client)
+    slug = urllib.parse.unquote(landed.split("/clients/", 1)[-1].split("/", 1)[0]) \
+        if "/clients/" in landed else ""
+    if not slug:
+        print("FAIL adding the client did not open it")
+        failures.append("add a client")
+    else:
+        q = urllib.parse.quote(slug)
+        for label, path in (("details", "edit"), ("documents", "documents"),
+                            ("make forms", "generate"), ("filled forms", "files"),
+                            ("opt-outs", "worklist")):
+            hit(f"tab: {label}", f"/clients/{q}/{path}")
+        hit("make the forms", f"/clients/{q}/generate", {})
+        hit("build the worklist", f"/clients/{q}/worklist", {})
+    hit("opt-out sites", "/optout-sites")
+    hit("form set-up", "/forms")
+    hit("add a form page", "/forms/new")
+    server.should_exit = True
+    if failures:
+        print("failed:", ", ".join(failures))
+        return 1
+    print("ok: every page worked")
+    return 0
+
+
 if __name__ == "__main__":
+    if "--page-check" in sys.argv:
+        raise SystemExit(page_check())
     if "--optout" in sys.argv or "--optout-check" in sys.argv:
         raise SystemExit(optout_main(sys.argv[1:]))
     raise SystemExit(main())
